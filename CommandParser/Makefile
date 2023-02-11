@@ -2,6 +2,7 @@ CC=gcc
 CFLAGS=-g -Wall
 INCLUDES=-I .
 CLILIB=libcli.a
+CLISHAREDLIB=libcli.so
 TARGET:${CLILIB}
 OBJ=cmd_hier.o parser.o serialize.o string_util.o clistd.o clicbext.o ../EventDispatcher/event_dispatcher.o ../gluethread/glthread.o ut/utinfra/ut_parser.o
 cmd_hier.o:cmd_hier.c
@@ -38,6 +39,7 @@ clean:
 	rm -f CMD_HIST_RECORD_FILE.txt
 install:
 	cp ${CLILIB} /usr/local/lib/
+	cp ${CLISHAREDLIB} /lib/
 	cp libcli.h /usr/include/
 	cp cmdtlv.h /usr/include/
 uninstall:
