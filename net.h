@@ -97,6 +97,8 @@ typedef struct node_nw_prop_{
 
 	/* Traffic generation */
 	glthread_t traffic_gen_db_head;
+
+    void *isis_node_info;
 } node_nw_prop_t;
 
 extern void init_arp_table(arp_table_t **arp_table);
@@ -170,6 +172,7 @@ typedef struct intf_nw_props_ {
     uint32_t pkt_recv;
     uint32_t pkt_sent;
 	uint32_t xmit_pkt_dropped;
+    void *isis_intf_info;
 } intf_nw_props_t;
 
 typedef union intf_prop_changed_ {
