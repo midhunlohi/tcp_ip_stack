@@ -34,10 +34,18 @@ OBJS=gluethread/glthread.o \
 		  Layer5/isis/isis_cli.o \
 		  Layer5/isis/isis_rtr.o \
 		  Layer5/isis/isis_intf.o \
+		  Layer5/isis/isis_pkt.o \
+		  Layer5/isis/isis_adjacency.o \
 		  #Layer2/stp/stp_state_machine.o \
 		  Layer2/stp/stp_bpdu.o \
 		  Layer2/stp/stp_init.o \
 		  Layer2/stp/stp_vlandb.o \
+
+Layer5/isis/isis_adjacency.o:Layer5/isis/isis_adjacency.c
+	${CC} ${CFLAGS} -c -I . Layer5/isis/isis_adjacency.c -o Layer5/isis/isis_adjacency.o
+
+Layer5/isis/isis_cli.o:Layer5/isis/isis_pkt.c
+	${CC} ${CFLAGS} -c -I . Layer5/isis/isis_pkt.c -o Layer5/isis/isis_pkt.o 
 
 Layer5/isis/isis_cli.o:Layer5/isis/isis_cli.c
 	${CC} ${CFLAGS} -c -I . Layer5/isis/isis_cli.c -o Layer5/isis/isis_cli.o 
