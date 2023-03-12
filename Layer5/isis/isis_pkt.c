@@ -9,7 +9,9 @@ bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
 }
 
 void isis_pkt_receive(void *arg, size_t arg_size) {
+#if 0
     printf("%s invoked \n", __FUNCTION__);
+#endif
 }
 
 byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
@@ -66,7 +68,7 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
     
     char buffer[200];
     int len = isis_print_hello_pkt(buffer, hello_pkt_hdr, *hello_pkt_size);
-    printf("ISIS_PTP_HELLO_PKT_TYPE : %s\n", buffer);
+    printf("ISIS Hello Pkt Sends ==> %s\n", buffer);
     return (byte*)hello_eth_hdr;
 }
 
@@ -88,7 +90,7 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
     char *val;
     char array[TLV_MAX][20];
     char str[INET_ADDRSTRLEN];
-
+    char *isis_proto_type = "ISIS_PTP_HELLO_PKT_TYPE";
     ITERATE_TLV_BEGIN(tlv_buffer, type, len, val, pkt_size){
         switch(type){
             case ISIS_TLV_HOSTNAME:
@@ -96,12 +98,12 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
                 break;
             case ISIS_TLV_RTR_ID:
                 memset(str, '\0', INET_ADDRSTRLEN);
-                inet_ntop(AF_INET, val, str, INET_ADDRSTRLEN);
+                sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
                 sprintf(array[TLV_RTR_ID], "%d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_IP:
                 memset(str, '\0', INET_ADDRSTRLEN);
-                inet_ntop(AF_INET, val, str, INET_ADDRSTRLEN);
+                sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
                 sprintf(array[TLV_IF_IP], "%d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_INDEX:
@@ -118,15 +120,52 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
         }
     }ITERATE_TLV_END(tlv_buffer, type, len, val, pkt_size)
 
-    sprintf(buff, "%s :: %s :: %s :: %s :: %s :: %s",
+    sprintf(buff, "%s : %s :: %s :: %s :: %s :: %s :: %s",
+                                            isis_proto_type,
                                             array[TLV_HOSTNAME],
                                             array[TLV_RTR_ID],
                                             array[TLV_IF_IP],
                                             array[TLV_IF_INDEX],
                                             array[TLV_HOLD_TIME],
                                             array[TLV_METRIC_VAL]);
-    int total_len = strlen(array[TLV_HOSTNAME]) + strlen(array[TLV_RTR_ID]) + 
+    int total_len = strlen(isis_proto_type) + 4 +
+                    strlen(array[TLV_HOSTNAME]) + strlen(array[TLV_RTR_ID]) + 
                     strlen(array[TLV_IF_IP]) + strlen(array[TLV_IF_INDEX]) + 
                     strlen(array[TLV_HOLD_TIME]) + strlen(array[TLV_METRIC_VAL]) + 25;
     return total_len;
+}
+
+/*
+* Function invokes by TCP/IP stack
+*/
+void 
+isis_print_pkt(void *arg, size_t arg_size){
+    pkt_info_t *pkt_info = (pkt_info_t*)arg;
+    if (!pkt_info) {
+        printf("Error : pkt_info is NULL\n");
+        return;
+    }
+
+    byte *buff = pkt_info->pkt_print_buffer;
+    size_t packet_size = pkt_info->pkt_size;
+
+    // printf("packet size = %ld = 0x%lx\n", packet_size, packet_size);
+
+    isis_pkt_hdr_t *isis_pkt_hdr = (isis_pkt_hdr_t*)(pkt_info->pkt);
+    pkt_info->bytes_written = 0;
+
+    isis_pkt_type_t pkt_type = isis_pkt_hdr->isis_pkt_type;
+
+    switch(pkt_type) {
+        case ISIS_PTP_HELLO_PKT_TYPE:
+            pkt_info->bytes_written += isis_print_hello_pkt(buff, isis_pkt_hdr, packet_size);
+            // printf("pkt_info->bytes_written = %d = 0x%x\n", pkt_info->bytes_written, pkt_info->bytes_written);
+            break;
+        case ISIS_LSP_PKT_TYPE:
+            //pkt_info->bytes_written += isis_print_lsp_pkt(buff, isis_pkt_hdr, packet_size);
+            break;
+        default:
+            break;
+    }
+    return;
 }

@@ -9,6 +9,7 @@
 #include "isis_rtr.h"
 #include "isis_intf.h"
 #include "isis_pkt.h"
+#include "isis_trace.h"
 
 typedef enum status_t{ 
     SUCCESS, 
@@ -161,9 +162,9 @@ isis_interface_config_handler(param_t *param,
             switch(enable_or_disable) {
                 case CONFIG_ENABLE:
                     if (SUCCESS == isis_enable_protocol_on_interface(intf)) {
-                        printf("config enabled for interace %s\n", if_name);
+                        LOG(LOG_DEBUG, ISIS_CONF, intf->att_node, intf, "%s: ISIS protocol enabled", __FUNCTION__);
                     } else {
-                        printf("Error to config for interace %s\n", if_name);
+                        LOG(LOG_ERROR, ISIS_CONF, intf->att_node, intf, "%s: Failed to configure ISIS protocol", __FUNCTION__);
                     }
                     break;
                 case CONFIG_DISABLE:
