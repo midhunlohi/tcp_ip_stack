@@ -9,7 +9,9 @@ bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
 }
 
 void isis_pkt_receive(void *arg, size_t arg_size) {
+#if 0
     printf("%s invoked \n", __FUNCTION__);
+#endif
 }
 
 byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
