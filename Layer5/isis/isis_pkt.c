@@ -1,7 +1,9 @@
 #include "../../tcp_public.h"
 #include "isis_pkt.h"
 #include "isis_const.h"
+#include "isis_rtr.h"
 #include <arpa/inet.h>
+#include "isis_trace.h"
 
 bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
     ethernet_hdr_t *eth_hdr = (ethernet_hdr_t*)pkt;
@@ -25,16 +27,17 @@ void isis_pkt_receive(void *arg, size_t arg_size) {
 #if 0
     printf("%s invoked \n", __FUNCTION__);
 #endif
-    pkt_notif_data_t* pkt_notif_data    = (pkt_notif_data_t*)arg;
-    node_t                      *node   = pkt_notif_data->recv_node;
-    interface_t *iif                    = pkt_notif_data->recv_interface;
-    ethernet_hdr_t *hello_eth_hdr       = (ethernet_hdr_t*)pkt_notif_data->pkt;
-    uint32_t pkt_size                   = pkt_notif_data->pkt_size;
+    pkt_notif_data_t*  pkt_notif_data = (pkt_notif_data_t*)arg;
+    node_t                      *node = pkt_notif_data->recv_node;
+    interface_t                  *iif = pkt_notif_data->recv_interface;
+    ethernet_hdr_t     *hello_eth_hdr = (ethernet_hdr_t*)pkt_notif_data->pkt;
+    uint32_t                 pkt_size = pkt_notif_data->pkt_size;
 
-    /*
-    * TODO : Check whether the ISIS protocol enabled on node. Then only process.
-    *        Return otherwise.
-    */
+    if (!isis_is_protocol_enable_on_node(node)) {
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: ISIS is not enabled on the node", 
+            __FUNCTION__);
+        return;
+    }
 
     isis_pkt_hdr_t *pkt_hdr = (isis_pkt_hdr_t*)GET_ETHERNET_HDR_PAYLOAD(hello_eth_hdr);
     switch(pkt_hdr->isis_pkt_type) {
