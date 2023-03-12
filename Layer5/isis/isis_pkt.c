@@ -98,12 +98,12 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
                 break;
             case ISIS_TLV_RTR_ID:
                 memset(str, '\0', INET_ADDRSTRLEN);
-                inet_ntop(AF_INET, val, str, INET_ADDRSTRLEN);
+                sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
                 sprintf(array[TLV_RTR_ID], "%d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_IP:
                 memset(str, '\0', INET_ADDRSTRLEN);
-                inet_ntop(AF_INET, val, str, INET_ADDRSTRLEN);
+                sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
                 sprintf(array[TLV_IF_IP], "%d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_INDEX:
