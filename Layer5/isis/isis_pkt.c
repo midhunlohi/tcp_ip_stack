@@ -8,10 +8,43 @@ bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
     return (eth_hdr->type == ISIS_ETH_PKT_TYPE);
 }
 
+void 
+isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth_hdr, size_t pkt_size){
+
+}
+
+void 
+isis_process_lsp_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *lsp_eth_hdr, size_t pkt_size){
+
+}
+
+/*
+* Receive Hello Pkt or Receive LSP Pkt
+*/
 void isis_pkt_receive(void *arg, size_t arg_size) {
 #if 0
     printf("%s invoked \n", __FUNCTION__);
 #endif
+    pkt_notif_data_t* pkt_notif_data    = (pkt_notif_data_t*)arg;
+    node_t                      *node   = pkt_notif_data->recv_node;
+    interface_t *iif                    = pkt_notif_data->recv_interface;
+    ethernet_hdr_t *hello_eth_hdr       = (ethernet_hdr_t*)pkt_notif_data->pkt;
+    uint32_t pkt_size                   = pkt_notif_data->pkt_size;
+
+    /*
+    * TODO : Check whether the ISIS protocol enabled on node. Then only process.
+    *        Return otherwise.
+    */
+
+    isis_pkt_hdr_t *pkt_hdr = (isis_pkt_hdr_t*)GET_ETHERNET_HDR_PAYLOAD(hello_eth_hdr);
+    switch(pkt_hdr->isis_pkt_type) {
+        case ISIS_PTP_HELLO_PKT_TYPE:
+            isis_process_hello_pkt(node, iif, hello_eth_hdr, pkt_size);
+            break;
+        case ISIS_LSP_PKT_TYPE:
+            isis_process_lsp_pkt(node, iif, hello_eth_hdr, pkt_size);
+            break;
+    }
 }
 
 byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
