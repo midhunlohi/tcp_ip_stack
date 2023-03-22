@@ -39,39 +39,39 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
     ITERATE_TLV_BEGIN(hello_tlv_buffer, type, len, val, tlv_buff_size){
         switch(type){
             case ISIS_TLV_HOSTNAME:
-                if (memcmp(adj->nbr_name, val, len)) {
+                if (memcmp(isis_intf_info->adjacency->nbr_name, val, len)) {
                     nbr_attr_changed = true;
-                    memcpy(adj->nbr_name, val, len);
+                    memcpy(isis_intf_info->adjacency->nbr_name, val, len);
                 }
                 break;
             case ISIS_TLV_RTR_ID:
-                if (adj->nbr_rtr_id != (int)*val) {
+                if (isis_intf_info->adjacency->nbr_rtr_id != (int)*val) {
                     nbr_attr_changed = true;
-                    adj->nbr_rtr_id = (int)*val;
+                    isis_intf_info->adjacency->nbr_rtr_id = (int)*val;
                 }
                 break;
             case ISIS_TLV_IF_IP:
-                if (adj->nbr_intf_ip != (int)*val) {
+                if (isis_intf_info->adjacency->nbr_intf_ip != (int)*val) {
                     nbr_attr_changed = true;
-                    adj->nbr_intf_ip = (int)*val;
+                    isis_intf_info->adjacency->nbr_intf_ip = (int)*val;
                 }
                 break;
             case ISIS_TLV_IF_INDEX:
-                if (adj->remote_if_index != (int)*val) {
+                if (isis_intf_info->adjacency->remote_if_index != (int)*val) {
                     nbr_attr_changed = true;
-                    adj->remote_if_index = (int)*val;
+                    isis_intf_info->adjacency->remote_if_index = (int)*val;
                 }
                 break;
             case ISIS_TLV_HOLD_TIME:
-                if (adj->hold_time != (int)*val) {
+                if (isis_intf_info->adjacency->hold_time != (int)*val) {
                     nbr_attr_changed = true;
-                    adj->hold_time = (int)*val;
+                    isis_intf_info->adjacency->hold_time = (int)*val;
                 }
                 break;
             case ISIS_TLV_METRIC_VAL:
-                if (adj->cost != (int)*val) {
+                if (isis_intf_info->adjacency->cost != (int)*val) {
                     nbr_attr_changed = true;
-                    adj->cost = (int)*val;
+                    isis_intf_info->adjacency->cost = (int)*val;
                 }
                 break;
             default:
