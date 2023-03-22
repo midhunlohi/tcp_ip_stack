@@ -79,3 +79,12 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
         }
     }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)
 }
+
+void
+isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
+    printf("Nbr : %s(%d)\n", adjacency->nbr_name, adjacency->nbr_rtr_id);
+    printf("Nbr intf ip: %d ifIndex : %d\n", adjacency->nbr_intf_ip, adjacency->remote_if_index);
+    printf("State : %s HT: %d sec Cost : %d", isis_adj_state_str(adjacency->adj_state),
+                                            adjacency->hold_time,
+                                            adjacency->cost);
+}

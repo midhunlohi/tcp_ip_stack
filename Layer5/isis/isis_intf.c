@@ -142,3 +142,10 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
     }
     return (false);
 }
+
+void 
+isis_show_interface_protocol_state(interface_t *intf) {
+    printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
+    printf("hello transmission : On\n"); // TODO : Based on the hello transmission.
+    return;
+}
