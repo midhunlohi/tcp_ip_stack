@@ -63,4 +63,6 @@ typedef struct isis_adjacency_{
     mac_add_t nbr_mac;
 }isis_adjacency_t;
 
+void isis_update_interface_adjacency_from_hello(interface_t *iif, byte *hello_tlv_buffer, size_t tlv_buff_size);
+
 #endif

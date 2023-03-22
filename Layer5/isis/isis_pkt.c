@@ -4,6 +4,7 @@
 #include "isis_rtr.h"
 #include <arpa/inet.h>
 #include "isis_trace.h"
+#include "isis_adjacency.h"
 
 bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
     ethernet_hdr_t *eth_hdr = (ethernet_hdr_t*)pkt;
@@ -12,7 +13,47 @@ bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
 
 void 
 isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth_hdr, size_t pkt_size){
+    uint8_t intf_ip_len = 0;
+    if (!isis_node_intf_is_enable(iif)) {
+        /* ISIS protocol is not enabled on the interface on the node*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: ISIS protocol is not enabled on the interface %s", __FUNCTION__, iif->if_name);
+        goto bad_hello;
+    }
+    if (!isis_interface_quality_to_send_hellos(iif)) {
+        /* Interface is not qualified to send hello packets*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Interface is not qualified to send hello packets %s", __FUNCTION__, iif->if_name);
+        goto bad_hello;
+    }
+    if (!IS_MAC_BROADCAST_ADDR(hello_eth_hdr->dst_mac.mac)) {
+        /* Dest MAC is not Broadcast address */
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Dest MAC is not Broadcast address", __FUNCTION__);
+        goto bad_hello;
+    }
+    
+    isis_pkt_hdr_t *hello_pkt_hdr = (isis_pkt_hdr_t*)GET_ETHERNET_HDR_PAYLOAD(hello_eth_hdr);
+    byte *hello_tlv_buffer = (byte*)(hello_pkt_hdr + 1);
+    size_t tlv_buff_size = pkt_size - ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(isis_pkt_hdr_t);
+    uint32_t *if_ip_addr_int = (uint32_t *)tlv_buffer_get_particular_tlv(hello_tlv_buffer, tlv_buff_size, ISIS_TLV_IF_IP, &intf_ip_len);
 
+    if (!if_ip_addr_int) {
+        /*IP TLV is missing in the packet*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: IP TLV is missing in the packet", __FUNCTION__);
+        goto bad_hello;
+    }
+
+    char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+    if (!is_same_subnet(IF_IP(iif), IF_MASK(iif), if_ip_addr_str)) {
+        /*Packet IP subnet is not matching with interface subnet.*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Packet IP subnet is not matching with interface subnet.", __FUNCTION__);
+        goto bad_hello;
+    }
+
+    isis_update_interface_adjacency_from_hello(iif, hello_tlv_buffer, tlv_buff_size);
+
+    return;
+
+    bad_hello:
+        LOG(LOG_ERROR, ISIS_PKT, node, iif, "%s: Hello packet rejected, node=%s, iif=%s", __FUNCTION__, node->node_name, iif->if_name);        
 }
 
 void 
