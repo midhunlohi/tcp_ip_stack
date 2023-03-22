@@ -2,11 +2,12 @@
 #define __ISIS_INTF__
 
 #include <stdlib.h>
-
+#include "isis_adjacency.h"
 typedef struct isis_intf_info_ {
     uint32_t cost; // Cost associated with this interface
     uint32_t hello_interval; // Time interval in sec.
     timer_event_handle *hello_xmit_timer; // hello packet transmit timer.
+    isis_adjacency_t *adjacency;
 }isis_intf_info_t;
 
 #define ISIS_INTF_INFO(intf_ptr) \

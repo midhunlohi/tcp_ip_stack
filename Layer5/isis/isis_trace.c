@@ -7,6 +7,8 @@ char
     switch(type) {
         case ISIS_CONF:
             return "ISIS(CONF)";
+        case ISIS_PKT:
+            return "ISIS(PKT)";
         default:
             break;
     }
