@@ -45,33 +45,33 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                 }
                 break;
             case ISIS_TLV_RTR_ID:
-                if (isis_intf_info->adjacency->nbr_rtr_id != (int)*val) {
+                if (isis_intf_info->adjacency->nbr_rtr_id != *(uint32_t*)val) {
                     nbr_attr_changed = true;
                     isis_intf_info->adjacency->nbr_rtr_id = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_IF_IP:
-                if (isis_intf_info->adjacency->nbr_intf_ip != (int)*val) {
+                if (isis_intf_info->adjacency->nbr_intf_ip != *(uint32_t*)val) {
                     nbr_attr_changed = true;
                     isis_intf_info->adjacency->nbr_intf_ip = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_IF_INDEX:
-                if (isis_intf_info->adjacency->remote_if_index != (int)*val) {
+                if (isis_intf_info->adjacency->remote_if_index != *(uint32_t*)val) {
                     nbr_attr_changed = true;
-                    isis_intf_info->adjacency->remote_if_index = (int)*val;
+                    isis_intf_info->adjacency->remote_if_index = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_HOLD_TIME:
-                if (isis_intf_info->adjacency->hold_time != (int)*val) {
+                if (isis_intf_info->adjacency->hold_time != *(uint32_t*)val) {
                     nbr_attr_changed = true;
-                    isis_intf_info->adjacency->hold_time = (int)*val;
+                    isis_intf_info->adjacency->hold_time = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_METRIC_VAL:
-                if (isis_intf_info->adjacency->cost != (int)*val) {
+                if (isis_intf_info->adjacency->cost != *(uint32_t*)val) {
                     nbr_attr_changed = true;
-                    isis_intf_info->adjacency->cost = (int)*val;
+                    isis_intf_info->adjacency->cost = *(uint32_t*)val;
                 }
                 break;
             default:
@@ -82,13 +82,17 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
 
 void
 isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
-    uint32_t* if_ip_addr_int = &adjacency->nbr_rtr_id;
-    char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
-    printf("\tNbr : %s(%s)\n", adjacency->nbr_name, if_ip_addr_str);
-    if_ip_addr_int = &adjacency->nbr_intf_ip;
-    if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
-    printf("\tNbr intf ip: %s ifIndex : %d\n", if_ip_addr_str, adjacency->remote_if_index);
-    printf("\tState : %s HT: %d sec Cost : %d\n", isis_adj_state_str(adjacency->adj_state),
-                                            adjacency->hold_time,
-                                            adjacency->cost);
+    if (adjacency) {
+        uint32_t* if_ip_addr_int = &adjacency->nbr_rtr_id;
+        char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+        printf("\tNbr : %s(%s)\n", adjacency->nbr_name, if_ip_addr_str);
+        if_ip_addr_int = &adjacency->nbr_intf_ip;
+        if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+        printf("\tNbr intf ip: %s ifIndex : %d\n", if_ip_addr_str, adjacency->remote_if_index);
+        printf("\tState : %s HT: %d sec Cost : %d\n", isis_adj_state_str(adjacency->adj_state),
+                                                adjacency->hold_time,
+                                                adjacency->cost);
+    } else {
+        printf("\tNbr : NILL\n");
+    }
 }
