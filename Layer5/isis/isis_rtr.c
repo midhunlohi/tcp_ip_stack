@@ -19,7 +19,7 @@ isis_is_protocol_enable_on_node(node_t *node) {
 void
 isis_show_node_protocol_state(node_t *node) {
     interface_t *intf = NULL;
-    printf("ÏSIS Protocol : %s\n", (isis_is_protocol_enable_on_node(node) == true)? "Ënabled" : "Disabled");
+    printf("ÏSIS Protocol : %s\n\n", (isis_is_protocol_enable_on_node(node) == true)? "Ënabled" : "Disabled");
     ITERATE_NODE_INTERFACES_BEGIN(node, intf){                       
         printf("%s : %s\n", intf->if_name, isis_node_intf_is_enable(intf) == 1 ? "Enabled" : "Disabled");
         isis_show_interface_protocol_state(intf);        
@@ -27,8 +27,11 @@ isis_show_node_protocol_state(node_t *node) {
         if (!isis_intf_info) {
             LOG(LOG_WARN, ISIS_CONF, intf->att_node, intf, "%s: Invalid isis interface info pointer", 
                                                                                         __FUNCTION__);
+            continue;
         }
+        printf("Adjacencies:\n");
         isis_show_adjacency(isis_intf_info->adjacency, 10);
+        printf("\n\n");
     }ITERATE_NODE_INTERFACES_END(node, intf);
 }
 

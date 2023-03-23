@@ -47,13 +47,13 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
             case ISIS_TLV_RTR_ID:
                 if (isis_intf_info->adjacency->nbr_rtr_id != (int)*val) {
                     nbr_attr_changed = true;
-                    isis_intf_info->adjacency->nbr_rtr_id = (int)*val;
+                    isis_intf_info->adjacency->nbr_rtr_id = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_IF_IP:
                 if (isis_intf_info->adjacency->nbr_intf_ip != (int)*val) {
                     nbr_attr_changed = true;
-                    isis_intf_info->adjacency->nbr_intf_ip = (int)*val;
+                    isis_intf_info->adjacency->nbr_intf_ip = *(uint32_t*)val;
                 }
                 break;
             case ISIS_TLV_IF_INDEX:
@@ -82,9 +82,13 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
 
 void
 isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
-    printf("Nbr : %s(%d)\n", adjacency->nbr_name, adjacency->nbr_rtr_id);
-    printf("Nbr intf ip: %d ifIndex : %d\n", adjacency->nbr_intf_ip, adjacency->remote_if_index);
-    printf("State : %s HT: %d sec Cost : %d", isis_adj_state_str(adjacency->adj_state),
+    uint32_t* if_ip_addr_int = &adjacency->nbr_rtr_id;
+    char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+    printf("\tNbr : %s(%s)\n", adjacency->nbr_name, if_ip_addr_str);
+    if_ip_addr_int = &adjacency->nbr_intf_ip;
+    if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+    printf("\tNbr intf ip: %s ifIndex : %d\n", if_ip_addr_str, adjacency->remote_if_index);
+    printf("\tState : %s HT: %d sec Cost : %d\n", isis_adj_state_str(adjacency->adj_state),
                                             adjacency->hold_time,
                                             adjacency->cost);
 }
