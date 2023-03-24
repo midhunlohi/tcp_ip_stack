@@ -150,15 +150,12 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
 void 
 isis_show_interface_protocol_state(interface_t *intf) {
     isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
-    printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
-    printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");
-    if (!intf_info_ptr) {
-        LOG(LOG_WARN, ISIS_CONF, intf->att_node, intf, "%s: Invalid isis interface info pointer", 
-                                                                                    __FUNCTION__);
-        return;
+    if (intf_info_ptr) {
+        printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
+        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");
+        printf("Adjacencies:\n");
+        isis_show_adjacency(intf_info_ptr->adjacency, 5);
+        printf("\n\n");
     }
-    printf("Adjacencies:\n");
-    isis_show_adjacency(intf_info_ptr->adjacency, 5);
-    printf("\n\n");
     return;
 }
