@@ -23,15 +23,6 @@ isis_show_node_protocol_state(node_t *node) {
     ITERATE_NODE_INTERFACES_BEGIN(node, intf){                       
         printf("%s : %s\n", intf->if_name, isis_node_intf_is_enable(intf) == 1 ? "Enabled" : "Disabled");
         isis_show_interface_protocol_state(intf);        
-        isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(intf);
-        if (!isis_intf_info) {
-            LOG(LOG_WARN, ISIS_CONF, intf->att_node, intf, "%s: Invalid isis interface info pointer", 
-                                                                                        __FUNCTION__);
-            continue;
-        }
-        printf("Adjacencies:\n");
-        isis_show_adjacency(isis_intf_info->adjacency, 10);
-        printf("\n\n");
     }ITERATE_NODE_INTERFACES_END(node, intf);
 }
 
