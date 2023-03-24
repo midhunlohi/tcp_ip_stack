@@ -142,7 +142,6 @@ isis_interface_config_handler(param_t *param,
         case CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_ALL:
             switch(enable_or_disable) {
                 case CONFIG_ENABLE:
-                    printf("Midhun debug 1\n");
                     ITERATE_NODE_INTERFACES_BEGIN(node, intf){
                         isis_enable_protocol_on_interface(intf);
                     }ITERATE_NODE_INTERFACES_END(node, intf);

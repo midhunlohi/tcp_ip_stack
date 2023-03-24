@@ -10,6 +10,7 @@ isis_init_isis_intf_info(interface_t *intf_ptr) {
     memset(intf_info_ptr, 0x0, sizeof(isis_intf_info_t));
     intf_info_ptr->cost = ISIS_DEFAULT_INTF_COST;
     intf_info_ptr->hello_interval = ISIS_DEFAULT_HELLO_INTERVAL;
+    intf_info_ptr->hello_transmission = false;
 }
 
 bool
@@ -110,6 +111,7 @@ isis_start_sending_hellos(interface_t *intf) {
 
     ISIS_INTF_HELLO_XMIT_TIMER(intf) = timer_register_app_event(wt, isis_transmit_hello_cb, (void *)timer_data, 
                             sizeof(isis_timer_data_t), ISIS_INTF_HELLO_INTERVAL(intf) * 1000, 1);
+    ISIS_INTF_HELLO_TX_STATUS(intf) = true;
     return;
 }
 
@@ -130,6 +132,7 @@ isis_stop_sending_hellos(interface_t *intf) {
     /** De Register **/
     timer_de_register_app_event(hello_xmit_timer);
     ISIS_INTF_HELLO_XMIT_TIMER(intf) = NULL;
+    ISIS_INTF_HELLO_TX_STATUS(intf) = false;
     return;
 }
 
@@ -145,7 +148,8 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
 
 void 
 isis_show_interface_protocol_state(interface_t *intf) {
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
     printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
-    printf("hello transmission : On\n"); // TODO : Based on the hello transmission.
+    printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");
     return;
 }

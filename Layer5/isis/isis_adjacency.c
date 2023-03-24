@@ -78,6 +78,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                 break;
         }
     }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)
+    isis_intf_info->adjacency->adj_state = ISIS_ADJ_STATE_UP;
 }
 
 void

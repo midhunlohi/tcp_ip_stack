@@ -16,6 +16,7 @@ typedef struct isis_pkt_hdr_{
 
 #define ISIS_INTF_COST(intf_ptr) ((isis_intf_info_t *)intf_ptr->intf_nw_props.isis_intf_info)->cost
 #define ISIS_INTF_HELLO_INTERVAL(intf_ptr) ((isis_intf_info_t *)intf_ptr->intf_nw_props.isis_intf_info)->hello_interval
+#define ISIS_INTF_HELLO_TX_STATUS(intf_ptr) ((isis_intf_info_t *)intf_ptr->intf_nw_props.isis_intf_info)->hello_transmission
 
 bool isis_pkt_trap_rule(char *pkt, size_t pkt_size);
 void isis_pkt_receive(void *arg, size_t arg_size);

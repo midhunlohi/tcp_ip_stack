@@ -8,7 +8,7 @@ typedef struct isis_intf_info_ {
     uint32_t hello_interval; // Time interval in sec.
     timer_event_handle *hello_xmit_timer; // hello packet transmit timer.
     isis_adjacency_t *adjacency; // Adjacency information
-    bool transmission; // Transmission status
+    bool hello_transmission; // Transmission status
 }isis_intf_info_t;
 
 #define ISIS_INTF_INFO(intf_ptr) \
