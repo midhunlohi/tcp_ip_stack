@@ -181,3 +181,21 @@ isis_update_adjacency_state(
     isis_adj_state_t new_adj_state) {
 
 }
+
+static void
+isis_adjacency_stop_expiry_timer(
+    isis_adjacency_t *adj) {
+        if (!adj->expiry_timer) {
+            return;
+        }
+    timer_de_register_app_event(adj->expiry_timer);
+    adj->expiry_timer = NULL;
+}
+
+static void 
+isis_adjacency_refresh_expiry_timer(
+    isis_adjacency_t *adj) {
+    assert(adj->expiry_timer);
+    timer_reschedule(adj->expiry_timer,
+    adj->hold_time * 1000);
+}
