@@ -14,7 +14,7 @@
                                     //hello interval configured on an interface 
                                     //by some constant factor, 
                                     //in this case we have taken it as 2.
-
+#define ISIS_ADJ_DEFAULT_DELETE_TIME 5*1000 // 5 Seconds
 /*ISIS TLVs*/
 #define ISIS_TLV_HOSTNAME   137 // As per standard
 #define ISIS_TLV_RTR_ID     134 // As per standard

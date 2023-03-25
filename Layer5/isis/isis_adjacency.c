@@ -101,3 +101,50 @@ isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
         printf("Nbr : NILL\n");
     }
 }
+
+/* Timer APIs */
+/*Delete Timer APIs*/
+/*
+* isis_adjacecncy_delete_timer_expire_cb() invokes at the time of expiration
+* of delete timer.
+*/
+static void
+isis_adjacecncy_delete_timer_expire_cb(void *arg, uint32_t arg_size) {
+    if (!arg) {
+        return;
+    }
+    isis_adjacency_t* adj = (isis_adjacency_t*)arg;
+    interface_t* intf = adj->intf;
+    isis_intf_info_t* intf_info = ISIS_INTF_INFO(intf);
+    intf_info->adjacency = NULL;
+    timer_de_register_app_event(adj->delete_timer);
+    adj->delete_timer = NULL;
+    assert(!adj->expiry_timer);
+    free(adj);
+}
+
+static void
+isis_adjacency_start_delete_timer(isis_adjacency_t *adj) {
+    if (adj->delete_timer) {
+        return;
+    }
+    adj->delete_timer = timer_register_app_event(
+        node_get_timer_instance(adj->intf->att_node),
+        isis_adjacecncy_delete_timer_expire_cb,
+        (void*)adj,
+        sizeof(isis_adjacency_t),
+        ISIS_ADJ_DEFAULT_DELETE_TIME,
+        0
+    );
+}
+
+static void
+isis_adjacency_stop_delete_timer(isis_adjacency_t *adj) {
+    if (!adj->delete_timer) {
+        return;
+    }
+    timer_de_register_app_event(adj->delete_timer);
+    adj->delete_timer = NULL;
+}
+
+/*Expiry Timer APIs*/
