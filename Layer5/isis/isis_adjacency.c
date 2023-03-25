@@ -3,6 +3,7 @@
 #include "isis_intf.h"
 #include "isis_trace.h"
 #include "isis_const.h"
+#include "isis_rtr.h"
 
 void isis_update_interface_adjacency_from_hello(interface_t *iif, 
                                                 byte *hello_tlv_buffer, 
@@ -198,4 +199,25 @@ isis_adjacency_refresh_expiry_timer(
     assert(adj->expiry_timer);
     timer_reschedule(adj->expiry_timer,
     adj->hold_time * 1000);
+}
+
+void
+isis_adjacency_set_uptime(isis_adjacency_t *adj) {
+    assert(adj->adj_state == ISIS_ADJ_STATE_UP);
+    adj->uptime = time(NULL);
+}
+
+void
+isis_delete_adjacency(isis_adjacency_t *adj) {
+    if (!adj) {
+        return;
+    }
+    if ((!isis_is_protocol_enable_on_node(adj->intf->att_node)) || 
+        (!isis_node_intf_is_enable(adj->intf))) {
+        isis_intf_info_t *intf_info = ISIS_INTF_INFO(adj->intf);
+        assert(intf_info);
+        intf_info->adjacency = NULL;
+        free(adj);
+        adj = NULL;
+    }
 }

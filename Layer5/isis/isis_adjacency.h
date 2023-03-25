@@ -74,4 +74,10 @@ isis_update_adjacency_state(
     isis_adjacency_t* adj, 
     isis_adj_state_t new_adj_state);
 
+void
+isis_adjacency_set_uptime(isis_adjacency_t *adjacency);
+
+void
+isis_delete_adjacency(isis_adjacency_t *adjacency);
+
 #endif
