@@ -25,6 +25,7 @@ isis_init(node_t *node) {
         return;
     }
     isis_node_info = (isis_node_info_t *)malloc(sizeof(isis_node_info_t));
+    memset(isis_node_info, 0x0, sizeof(isis_node_info_t));
     node->node_nw_prop.isis_node_info = isis_node_info;
     tcp_stack_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
     printf("%s, ISIS protocol ENABLED on this node\n", __FUNCTION__);

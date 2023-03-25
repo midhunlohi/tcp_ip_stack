@@ -39,6 +39,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
         adj->adj_state = ISIS_ADJ_STATE_DOWN;
         isis_intf_info->adjacency = adj;
         isis_adjacency_start_delete_timer(isis_intf_info->adjacency);
+        ISIS_INCREMENT_NODE_STATS(isis_intf_info->adjacency->intf->att_node, adj_up_count);
     }
 
     ITERATE_TLV_BEGIN(hello_tlv_buffer, type, len, val, tlv_buff_size){
@@ -112,6 +113,7 @@ isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
         } else {
             printf("Expiry Timer : NIL\n");
         }
+        PRINT_TABS(tab_spaces);
         if (adjacency->delete_timer) {
             printf("Delete Timer Remaining : %u msec\n", 
                     wt_get_remaining_time(adjacency->delete_timer));
@@ -233,11 +235,12 @@ isis_delete_adjacency(isis_adjacency_t *adj) {
     }
     isis_intf_info_t *intf_info = ISIS_INTF_INFO(adj->intf);
     assert(intf_info);
+    ISIS_DECREMENT_NODE_STATS(adj->intf->att_node, adj_up_count);
     intf_info->adjacency = NULL;
     isis_adjacency_stop_delete_timer(adj);
     isis_adjacency_stop_expiry_timer(adj);
     free(adj);
-    adj = NULL;
+    adj = NULL;    
 }
 
 isis_adj_state_t 

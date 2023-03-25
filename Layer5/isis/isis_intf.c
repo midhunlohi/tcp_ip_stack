@@ -87,7 +87,7 @@ isis_transmit_hello_cb(void *arg, uint32_t arg_size) {
     size_t hello_pkt_size = timer_data->data_size;
     
     send_pkt_out(hello_pkt, hello_pkt_size, intf);
-
+    ISIS_INCREMENT_INTF_STAT(intf, hello_pkt_snt_cnt);
     return;
 }
 
@@ -149,12 +149,24 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
     return (false);
 }
 
+static void
+isis_print_intf_stats(interface_t *intf) {    
+        PRINT_TABS(5);
+        printf("Hello pkts rcvd : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_rcv_cnt));
+        PRINT_TABS(5);
+        printf("Hello pkts sent : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_snt_cnt));
+        PRINT_TABS(5);
+        printf("Hello pkts dropped : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_drp_cnt));
+}
+
 void 
 isis_show_interface_protocol_state(interface_t *intf) {
     isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
     if (intf_info_ptr) {
         printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
-        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");
+        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");    
+        printf("Stats:\n");
+        isis_print_intf_stats(intf);
         printf("Adjacencies:\n");
         isis_show_adjacency(intf_info_ptr->adjacency, 5);
         printf("\n\n");

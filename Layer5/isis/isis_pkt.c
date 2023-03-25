@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include "isis_trace.h"
 #include "isis_adjacency.h"
+#include "isis_intf.h"
 
 bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
     ethernet_hdr_t *eth_hdr = (ethernet_hdr_t*)pkt;
@@ -49,11 +50,12 @@ isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth
     }
 
     isis_update_interface_adjacency_from_hello(iif, hello_tlv_buffer, tlv_buff_size);
-
+    ISIS_INCREMENT_INTF_STAT(iif, hello_pkt_rcv_cnt);
     return;
 
     bad_hello:
-        LOG(LOG_ERROR, ISIS_PKT, node, iif, "%s: Hello packet rejected, node=%s, iif=%s", __FUNCTION__, node->node_name, iif->if_name);        
+        LOG(LOG_ERROR, ISIS_PKT, node, iif, "%s: Hello packet rejected, node=%s, iif=%s", __FUNCTION__, node->node_name, iif->if_name);
+        ISIS_INCREMENT_INTF_STAT(iif, hello_pkt_drp_cnt);
 }
 
 void 
