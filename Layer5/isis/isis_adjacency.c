@@ -5,6 +5,9 @@
 #include "isis_const.h"
 #include "isis_rtr.h"
 
+static void
+isis_adjacency_start_delete_timer(isis_adjacency_t *adj);
+
 void isis_update_interface_adjacency_from_hello(interface_t *iif, 
                                                 byte *hello_tlv_buffer, 
                                                 size_t tlv_buff_size) {
@@ -35,6 +38,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
         new_adj = true;
         adj->adj_state = ISIS_ADJ_STATE_DOWN;
         isis_intf_info->adjacency = adj;
+        isis_adjacency_start_delete_timer(isis_intf_info->adjacency);
     }
 
     ITERATE_TLV_BEGIN(hello_tlv_buffer, type, len, val, tlv_buff_size){
@@ -78,8 +82,12 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
             default:
                 break;
         }
-    }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)
-    //isis_intf_info->adjacency->adj_state = ISIS_ADJ_STATE_UP; TODO
+    }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)   
+    /*A good hello pkt arrived at interface and adjacency already existing*/
+    if (!new_adj) {
+        isis_adj_state_t next_state = isis_get_next_state(isis_intf_info->adjacency);
+        isis_update_adjacency_state(isis_intf_info->adjacency, next_state);
+    }
 }
 
 void
@@ -194,13 +202,6 @@ isis_adjacency_start_expiry_timer(isis_adjacency_t *adj) {
         0);
 }
 
-void
-isis_update_adjacency_state(
-    isis_adjacency_t* adj, 
-    isis_adj_state_t new_adj_state) {
-
-}
-
 static void
 isis_adjacency_stop_expiry_timer(
     isis_adjacency_t *adj) {
@@ -230,14 +231,13 @@ isis_delete_adjacency(isis_adjacency_t *adj) {
     if (!adj) {
         return;
     }
-    if ((!isis_is_protocol_enable_on_node(adj->intf->att_node)) || 
-        (!isis_node_intf_is_enable(adj->intf))) {
-        isis_intf_info_t *intf_info = ISIS_INTF_INFO(adj->intf);
-        assert(intf_info);
-        intf_info->adjacency = NULL;
-        free(adj);
-        adj = NULL;
-    }
+    isis_intf_info_t *intf_info = ISIS_INTF_INFO(adj->intf);
+    assert(intf_info);
+    intf_info->adjacency = NULL;
+    isis_adjacency_stop_delete_timer(adj);
+    isis_adjacency_stop_expiry_timer(adj);
+    free(adj);
+    adj = NULL;
 }
 
 isis_adj_state_t 
@@ -257,4 +257,82 @@ isis_get_next_state(isis_adjacency_t *adj) {
             break;            
     }
     return next_state;
+}
+
+void
+isis_update_adjacency_state(
+    isis_adjacency_t* adj, 
+    isis_adj_state_t new_state) {
+    if (!adj) {
+        return;
+    }
+    isis_adj_state_t cur_state = adj->adj_state;
+    switch(cur_state) {
+        case ISIS_ADJ_STATE_DOWN: 
+            {
+                switch(new_state) {                    
+                    case ISIS_ADJ_STATE_INIT:
+                        {
+                            adj->adj_state = new_state;
+                            isis_adjacency_stop_delete_timer(adj);
+                            isis_adjacency_start_expiry_timer(adj);
+                        }
+                        break;
+                    case ISIS_ADJ_STATE_UP:
+                        {
+                            adj->adj_state = ISIS_ADJ_STATE_UP;
+                            isis_adjacency_refresh_expiry_timer(adj);
+                            adj->uptime = time(NULL);
+                        }
+                        break;     
+                    default:
+                        break;               
+                }
+            }
+            break;
+        case ISIS_ADJ_STATE_INIT: 
+            {
+                switch(new_state) {
+                    case ISIS_ADJ_STATE_DOWN:
+                        {
+                            adj->adj_state = new_state;
+                            isis_adjacency_stop_expiry_timer(adj);
+                            isis_adjacency_start_delete_timer(adj);
+                        }
+                        break;
+                    case ISIS_ADJ_STATE_UP:
+                        {
+                            adj->adj_state = new_state;
+                            isis_adjacency_refresh_expiry_timer(adj);
+                            isis_adjacency_set_uptime(adj);
+                        }
+                        break;                    
+                    default:
+                        break;
+                }
+            }
+            break;
+        case ISIS_ADJ_STATE_UP: 
+            {
+                switch(new_state) {
+                    case ISIS_ADJ_STATE_DOWN:
+                        {
+                            adj->adj_state = new_state;
+                            isis_adjacency_stop_expiry_timer(adj);
+                            isis_adjacency_start_delete_timer(adj);
+                        }
+                        break;
+                    case ISIS_ADJ_STATE_UP:
+                        {
+                            isis_adjacency_refresh_expiry_timer(adj);                            
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            break;
+        default:
+            break;
+    }
 }
