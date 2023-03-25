@@ -148,3 +148,36 @@ isis_adjacency_stop_delete_timer(isis_adjacency_t *adj) {
 }
 
 /*Expiry Timer APIs*/
+/*
+* Bringdown the adjacency state from INIT/UP to DOWN state.
+*/
+static void
+isis_adjacecncy_down_timer_expire_cb(void *arg, uint32_t arg_size) {
+    if (!arg) {
+        return;
+    }
+    isis_adjacency_t* adj = (isis_adjacency_t*)arg;
+    timer_de_register_app_event(adj->expiry_timer);
+    adj->expiry_timer = NULL;
+    isis_update_adjacency_state(adj, ISIS_ADJ_STATE_DOWN);
+}
+
+static void
+isis_adjacency_start_expiry_timer(isis_adjacency_t *adj) {
+    if (adj->expiry_timer) {
+        return;
+    }
+    adj->expiry_timer = timer_register_app_event(
+        node_get_timer_instance(adj->intf->att_node),
+        isis_adjacecncy_down_timer_expire_cb,
+        (void*)adj, sizeof(isis_adjacency_t),
+        adj->hold_time * 1000,
+        0);
+}
+
+void
+isis_update_adjacency_state(
+    isis_adjacency_t* adj, 
+    isis_adj_state_t new_adj_state) {
+
+}

@@ -69,4 +69,9 @@ isis_update_interface_adjacency_from_hello(interface_t *iif, byte *hello_tlv_buf
 void
 isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces);
 
+void
+isis_update_adjacency_state(
+    isis_adjacency_t* adj, 
+    isis_adj_state_t new_adj_state);
+
 #endif
