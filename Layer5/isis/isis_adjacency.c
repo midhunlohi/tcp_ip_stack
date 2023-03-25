@@ -79,7 +79,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                 break;
         }
     }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)
-    isis_intf_info->adjacency->adj_state = ISIS_ADJ_STATE_UP;
+    //isis_intf_info->adjacency->adj_state = ISIS_ADJ_STATE_UP; TODO
 }
 
 void
@@ -97,9 +97,27 @@ isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
         printf("State : %s HT: %d sec Cost : %d\n", isis_adj_state_str(adjacency->adj_state),
                                                 adjacency->hold_time,
                                                 adjacency->cost);
+        PRINT_TABS(tab_spaces);
+        if (adjacency->expiry_timer) {
+            printf("Expiry Timer Remaining : %u msec\n", 
+                    wt_get_remaining_time(adjacency->expiry_timer));
+        } else {
+            printf("Expiry Timer : NIL\n");
+        }
+        if (adjacency->delete_timer) {
+            printf("Delete Timer Remaining : %u msec\n", 
+                    wt_get_remaining_time(adjacency->delete_timer));
+        } else {
+            printf("Delete Timer : NIL\n");
+        }
+        PRINT_TABS(tab_spaces);
+        if (adjacency->adj_state == ISIS_ADJ_STATE_UP) {
+            printf("Up Time : %s\n", 
+                hrs_min_sec_format((unsigned int)difftime(time(NULL), adjacency->uptime)));
+        }
     } else {
         PRINT_TABS(tab_spaces);        
-        printf("Nbr : NILL\n");
+        printf("Nbr : NIL\n");
     }
 }
 
