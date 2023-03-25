@@ -19,8 +19,15 @@ typedef struct isis_timer_data_ {
                                 ((isis_node_info_t *)(node_ptr->node_nw_prop.isis_node_info))->field++
 #define ISIS_DECREMENT_NODE_STATS(node_ptr, field) \
                                 ((isis_node_info_t *)(node_ptr->node_nw_prop.isis_node_info))->field--
-#define ISIS_GET_NODE_STATS(node_ptr, field) \
-                                ((isis_node_info_t *)(node_ptr->node_nw_prop.isis_node_info))->field
+#define ISIS_GET_NODE_STATS(node_ptr, field)                                                \
+        ({                                                                                  \
+            uint32_t val = 0;                                                               \
+            if (node_ptr->node_nw_prop.isis_node_info) {                                    \
+                val = ((isis_node_info_t *)(node_ptr->node_nw_prop.isis_node_info))->field; \
+            }                                                                               \
+            val;                                                                            \
+        })
+                               
 bool
 isis_is_protocol_enable_on_node(node_t *node);
 
