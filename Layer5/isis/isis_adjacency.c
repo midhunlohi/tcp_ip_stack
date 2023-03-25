@@ -239,3 +239,22 @@ isis_delete_adjacency(isis_adjacency_t *adj) {
         adj = NULL;
     }
 }
+
+isis_adj_state_t 
+isis_get_next_state(isis_adjacency_t *adj) {
+    isis_adj_state_t next_state = ISIS_ADJ_STATE_UNKNOWN;
+    switch(adj->adj_state) {
+        case ISIS_ADJ_STATE_DOWN:
+            next_state = ISIS_ADJ_STATE_INIT;
+            break;
+        case ISIS_ADJ_STATE_INIT:
+            next_state = ISIS_ADJ_STATE_UP;
+            break;
+        case ISIS_ADJ_STATE_UP:
+            next_state = ISIS_ADJ_STATE_UP;
+            break;
+        default:
+            break;            
+    }
+    return next_state;
+}

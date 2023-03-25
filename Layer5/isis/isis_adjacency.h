@@ -80,4 +80,7 @@ isis_adjacency_set_uptime(isis_adjacency_t *adjacency);
 void
 isis_delete_adjacency(isis_adjacency_t *adjacency);
 
+isis_adj_state_t 
+isis_get_next_state(isis_adjacency_t *adj);
+
 #endif
