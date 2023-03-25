@@ -38,8 +38,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
         new_adj = true;
         adj->adj_state = ISIS_ADJ_STATE_DOWN;
         isis_intf_info->adjacency = adj;
-        isis_adjacency_start_delete_timer(isis_intf_info->adjacency);
-        ISIS_INCREMENT_NODE_STATS(isis_intf_info->adjacency->intf->att_node, adj_up_count);
+        isis_adjacency_start_delete_timer(isis_intf_info->adjacency);        
     }
 
     ITERATE_TLV_BEGIN(hello_tlv_buffer, type, len, val, tlv_buff_size){
@@ -308,6 +307,7 @@ isis_update_adjacency_state(
                             adj->adj_state = new_state;
                             isis_adjacency_refresh_expiry_timer(adj);
                             isis_adjacency_set_uptime(adj);
+                            ISIS_INCREMENT_NODE_STATS(adj->intf->att_node, adj_up_count);
                         }
                         break;                    
                     default:
