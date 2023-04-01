@@ -149,7 +149,7 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
     return (false);
 }
 
-static void
+void
 isis_print_intf_stats(interface_t *intf) {    
         PRINT_TABS(5);
         printf("Hello pkts rcvd : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_rcv_cnt));

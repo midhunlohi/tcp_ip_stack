@@ -17,6 +17,19 @@ isis_is_protocol_enable_on_node(node_t *node) {
 }
 
 void
+isis_show_node_protocol_interface_stats(node_t *node) {
+    interface_t *intf = NULL;
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+        if (isis_node_intf_is_enable(intf)) {
+            printf("%s : %s\n", intf->if_name, "Enabled");
+            isis_print_intf_stats(intf);
+        } else {
+            printf("%s : %s\n", intf->if_name, "Disabled");
+        }
+    }ITERATE_NODE_INTERFACES_END(node, intf);
+}
+
+void
 isis_show_node_protocol_state(node_t *node) {
     interface_t *intf = NULL;
     printf("ÏSIS Protocol : %s\n\n", (isis_is_protocol_enable_on_node(node) == true)? "Ënabled" : "Disabled");

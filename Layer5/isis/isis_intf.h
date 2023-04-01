@@ -51,4 +51,6 @@ isis_interface_quality_to_send_hellos(interface_t *intf);
 void 
 isis_show_interface_protocol_state(interface_t *intf);
 
+void
+isis_print_intf_stats(interface_t *intf);
 #endif
