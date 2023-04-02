@@ -278,3 +278,66 @@ isis_show_cli_tree(param_t *param) {
     }
     return 0;
 }
+
+/*
+* isis_clear_handler()
+* Function to display the clear command - clear node <node-name> protocol isis <>
+*/
+static int 
+isis_clear_handler(param_t *param, 
+                    ser_buff_t *tlv_buf,
+                    op_mode enable_or_disable) {
+    int cmdcode         = -1;
+    tlv_struct_t *tlv   = NULL;
+    char *node_name     = NULL;
+    node_t *node        = NULL;
+    
+    cmdcode = EXTRACT_CMD_CODE(tlv_buf);
+    
+    TLV_LOOP_BEGIN(tlv_buf, tlv) {
+        if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
+            node_name = tlv->value;
+        } else {
+            assert(0);
+        }
+    }TLV_LOOP_END;
+
+    node = node_get_node_by_name(topo, node_name);
+
+    switch(cmdcode) {
+        case CMDCODE_CLEAR_NODE_ISIS_PROTOCOL:
+            /*clear node <node-name> protocol isis*/
+            /*NO-OP*/
+            break;
+        case CMDCODE_CLEAR_NODE_ISIS_PROTOCOL_ADJACENCIES:
+            /*clear node <node-name> protocol isis adjacencies*/
+            isis_clear_node_protocol_adjacency(node);
+            break;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+/*
+* isis_clear_cli_tree()
+* Function to register the clear commands for the ISIS protocol
+*/
+int
+isis_clear_cli_tree(param_t *param) {
+    {
+        /*Register for the command : clear node <node-name> protocol isis*/
+        static param_t isis_proto;
+        init_param(&isis_proto, CMD, "isis", isis_clear_handler, 0, INVALID, 0, "isis protocol");
+        libcli_register_param(param, &isis_proto);
+        set_param_cmd_code(&isis_proto, CMDCODE_CLEAR_NODE_ISIS_PROTOCOL);
+        {
+            /*Register for the command : clear node <node-name> protocol isis adjacencies*/
+            static param_t clear_adj;
+            init_param(&clear_adj, CMD, "adjacencies", isis_clear_handler, 0, INVALID, 0, "clear all adjacencies");
+            libcli_register_param(&isis_proto, &clear_adj);
+            set_param_cmd_code(&clear_adj, CMDCODE_CLEAR_NODE_ISIS_PROTOCOL_ADJACENCIES);
+        }
+    }
+}

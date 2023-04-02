@@ -53,4 +53,7 @@ isis_show_interface_protocol_state(interface_t *intf);
 
 void
 isis_print_intf_stats(interface_t *intf);
+
+void
+isis_clear_interface_protocol_adjacency(interface_t *intf);
 #endif

@@ -173,3 +173,21 @@ isis_show_interface_protocol_state(interface_t *intf) {
     }
     return;
 }
+
+/*
+* isis_clear_interface_protocol_adjacency()
+* The function free the resources allocated for adjacency for an interface
+*/
+void
+isis_clear_interface_protocol_adjacency(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+
+    if (!intf_info_ptr) {
+        return;
+    }
+    isis_delete_adjacency(intf_info_ptr->adjacency);
+    return;
+}
