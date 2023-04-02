@@ -79,6 +79,12 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                     isis_intf_info->adjacency->cost = *(uint32_t*)val;
                 }
                 break;
+            case ISIS_TLV_MAC_ADDR:
+                if (memcmp(&isis_intf_info->adjacency->nbr_mac, (unsigned char*)val, sizeof(mac_add_t))) {
+                    nbr_attr_changed = true;
+                    memcpy(&isis_intf_info->adjacency->nbr_mac, (unsigned char*)val, sizeof(mac_add_t));
+                }
+                break;
             default:
                 break;
         }
@@ -101,6 +107,14 @@ isis_show_adjacency( isis_adjacency_t *adjacency, uint8_t tab_spaces) {
         if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
         PRINT_TABS(tab_spaces);        
         printf("Nbr intf ip: %s ifIndex : %d\n", if_ip_addr_str, adjacency->remote_if_index);
+        PRINT_TABS(tab_spaces);
+        printf("Nbr intf MAC: %.2X:%.2X:%.2X:%.2X:%.2X:%.2X\n",
+                    (unsigned char)adjacency->nbr_mac.mac[0],
+                    (unsigned char)adjacency->nbr_mac.mac[1],
+                    (unsigned char)adjacency->nbr_mac.mac[2],
+                    (unsigned char)adjacency->nbr_mac.mac[3],
+                    (unsigned char)adjacency->nbr_mac.mac[4],
+                    (unsigned char)adjacency->nbr_mac.mac[5]);
         PRINT_TABS(tab_spaces);        
         printf("State : %s HT: %d sec Cost : %d\n", isis_adj_state_str(adjacency->adj_state),
                                                 adjacency->hold_time,
