@@ -10,6 +10,7 @@
 #include "isis_intf.h"
 #include "isis_pkt.h"
 #include "isis_trace.h"
+#include "isis_const.h"
 
 typedef enum status_t{ 
     SUCCESS, 
@@ -25,6 +26,7 @@ isis_init(node_t *node) {
         return;
     }
     isis_node_info = (isis_node_info_t *)malloc(sizeof(isis_node_info_t));
+    memset(isis_node_info, 0x0, sizeof(isis_node_info_t));
     node->node_nw_prop.isis_node_info = isis_node_info;
     tcp_stack_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
     printf("%s, ISIS protocol ENABLED on this node\n", __FUNCTION__);
@@ -94,6 +96,16 @@ isis_config_handler(param_t *param,
     return 0;
 }
 
+int
+hello_interval_validate(char *interval) {
+    uint32_t hello_interval = atoi(interval);
+    if (hello_interval <= 3 || hello_interval >= 100) {
+        printf("Error : Invalid Value, expected between 3 and 100\n");
+        return VALIDATION_FAILED;
+    }
+    return VALIDATION_SUCCESS;
+}
+
 /*
 * isis_interface_config_handler()
 * conf node <node-name> protocol isis interface all
@@ -114,14 +126,18 @@ isis_interface_config_handler(param_t *param,
     char *if_name       = NULL;
     node_t *node        = NULL;
     interface_t *intf   = NULL;
-
+    uint32_t hello_interval = ISIS_DEFAULT_HELLO_INTERVAL;
+    bool    hello_cmd = false;
     cmdcode = EXTRACT_CMD_CODE(tlv_buf);
-    
+
     TLV_LOOP_BEGIN(tlv_buf, tlv) {
         if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
             node_name = tlv->value;
         } else if (strncmp(tlv->leaf_id, "if-name", strlen("if-name")) == 0) {
-            if_name = tlv->value;
+            if_name = tlv->value;            
+        } else if (strncmp(tlv->leaf_id, "hello-interval", strlen("hello-interval")) == 0) {
+            hello_interval = atoi(tlv->value);
+            hello_cmd = true;            
         } else {
             assert(0);
         }
@@ -142,7 +158,6 @@ isis_interface_config_handler(param_t *param,
         case CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_ALL:
             switch(enable_or_disable) {
                 case CONFIG_ENABLE:
-                    printf("Midhun debug 1\n");
                     ITERATE_NODE_INTERFACES_BEGIN(node, intf){
                         isis_enable_protocol_on_interface(intf);
                     }ITERATE_NODE_INTERFACES_END(node, intf);
@@ -176,6 +191,25 @@ isis_interface_config_handler(param_t *param,
                     break;
                 default:
                     break;
+            }
+        case CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL_PARAM:
+            switch(enable_or_disable) {
+                case CONFIG_ENABLE:
+                    if (hello_cmd) {
+                        isis_update_interface_protocol_hello_interval(intf, hello_interval);
+                        isis_stop_sending_hellos(intf);
+                        isis_start_sending_hellos(intf);
+                    }
+                    break;
+                case CONFIG_DISABLE:
+                    if (hello_cmd) {
+                        isis_update_interface_protocol_hello_interval(intf, ISIS_DEFAULT_HELLO_INTERVAL);
+                        isis_stop_sending_hellos(intf);
+                        isis_start_sending_hellos(intf);
+                    }
+                    break;
+                default:
+                    break;      
             }
     }
 
@@ -213,6 +247,22 @@ isis_config_cli_tree(param_t *param)
             init_param(&intf_name, LEAF, 0, isis_interface_config_handler, 0, STRING, "if-name", "interface name");
             libcli_register_param(&isis_interface, &intf_name);
             set_param_cmd_code(&intf_name, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF);
+            {
+                /*Register for cmd - conf node <node-name> protocol isis interface <if-name> hello-interval*/
+                static param_t hello_intrvl_cmd;
+                init_param(&hello_intrvl_cmd, CMD, "hello-interval", isis_interface_config_handler, 0, 
+                            INVALID, 0, "hello interval value");
+                libcli_register_param(&intf_name, &hello_intrvl_cmd);
+                set_param_cmd_code(&hello_intrvl_cmd, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL);
+                {
+                    /*Register for param - conf node <node-name> protocol isis interface <if-name> hello-interval <hello-interval-value>*/
+                    static param_t hello_intrvl_param;
+                    init_param(&hello_intrvl_param, LEAF, 0, isis_interface_config_handler, hello_interval_validate,
+                                INT, "hello-interval", "hello interval value");
+                    libcli_register_param(&hello_intrvl_cmd, &hello_intrvl_param);
+                    set_param_cmd_code(&hello_intrvl_param, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL_PARAM);
+                }
+            }
         }
     }
 
@@ -249,6 +299,9 @@ isis_show_handler(param_t *param,
         case CMDCODE_SHOW_NODE_ISIS_PROTOCOL:
             isis_show_node_protocol_state(node);
             break;
+        case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS:
+            isis_show_node_protocol_interface_stats(node);
+            break;
         default:
             break;
     }
@@ -261,9 +314,80 @@ isis_show_handler(param_t *param,
 */
 int
 isis_show_cli_tree(param_t *param) {
-    static param_t isis_proto;
-    init_param(&isis_proto, CMD, "isis", isis_show_handler, 0, INVALID, 0, "isis protocol");
-    libcli_register_param(param, &isis_proto);
-    set_param_cmd_code(&isis_proto, CMDCODE_SHOW_NODE_ISIS_PROTOCOL);
+    {
+        static param_t isis_proto;
+        init_param(&isis_proto, CMD, "isis", isis_show_handler, 0, INVALID, 0, "isis protocol");
+        libcli_register_param(param, &isis_proto);
+        set_param_cmd_code(&isis_proto, CMDCODE_SHOW_NODE_ISIS_PROTOCOL);
+        {
+            static param_t interface_stats;
+            init_param(&interface_stats, CMD, "interface", isis_show_handler, 0, INVALID, 0, "interface statistics");
+            libcli_register_param(&isis_proto, &interface_stats);
+            set_param_cmd_code(&interface_stats, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS);
+        }
+    }
     return 0;
+}
+
+/*
+* isis_clear_handler()
+* Function to display the clear command - clear node <node-name> protocol isis <>
+*/
+static int 
+isis_clear_handler(param_t *param, 
+                    ser_buff_t *tlv_buf,
+                    op_mode enable_or_disable) {
+    int cmdcode         = -1;
+    tlv_struct_t *tlv   = NULL;
+    char *node_name     = NULL;
+    node_t *node        = NULL;
+    
+    cmdcode = EXTRACT_CMD_CODE(tlv_buf);
+    
+    TLV_LOOP_BEGIN(tlv_buf, tlv) {
+        if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
+            node_name = tlv->value;
+        } else {
+            assert(0);
+        }
+    }TLV_LOOP_END;
+
+    node = node_get_node_by_name(topo, node_name);
+
+    switch(cmdcode) {
+        case CMDCODE_CLEAR_NODE_ISIS_PROTOCOL:
+            /*clear node <node-name> protocol isis*/
+            /*NO-OP*/
+            break;
+        case CMDCODE_CLEAR_NODE_ISIS_PROTOCOL_ADJACENCIES:
+            /*clear node <node-name> protocol isis adjacencies*/
+            isis_clear_node_protocol_adjacency(node);
+            break;
+        default:
+            break;
+    }
+
+    return 0;
+}
+
+/*
+* isis_clear_cli_tree()
+* Function to register the clear commands for the ISIS protocol
+*/
+int
+isis_clear_cli_tree(param_t *param) {
+    {
+        /*Register for the command : clear node <node-name> protocol isis*/
+        static param_t isis_proto;
+        init_param(&isis_proto, CMD, "isis", isis_clear_handler, 0, INVALID, 0, "isis protocol");
+        libcli_register_param(param, &isis_proto);
+        set_param_cmd_code(&isis_proto, CMDCODE_CLEAR_NODE_ISIS_PROTOCOL);
+        {
+            /*Register for the command : clear node <node-name> protocol isis adjacencies*/
+            static param_t clear_adj;
+            init_param(&clear_adj, CMD, "adjacencies", isis_clear_handler, 0, INVALID, 0, "clear all adjacencies");
+            libcli_register_param(&isis_proto, &clear_adj);
+            set_param_cmd_code(&clear_adj, CMDCODE_CLEAR_NODE_ISIS_PROTOCOL_ADJACENCIES);
+        }
+    }
 }

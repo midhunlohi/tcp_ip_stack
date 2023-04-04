@@ -1,17 +1,96 @@
 #include "../../tcp_public.h"
 #include "isis_pkt.h"
 #include "isis_const.h"
+#include "isis_rtr.h"
 #include <arpa/inet.h>
+#include "isis_trace.h"
+#include "isis_adjacency.h"
+#include "isis_intf.h"
 
 bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
     ethernet_hdr_t *eth_hdr = (ethernet_hdr_t*)pkt;
     return (eth_hdr->type == ISIS_ETH_PKT_TYPE);
 }
 
+void 
+isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth_hdr, size_t pkt_size){
+    uint8_t intf_ip_len = 0;
+    if (!isis_node_intf_is_enable(iif)) {
+        /* ISIS protocol is not enabled on the interface on the node*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: ISIS protocol is not enabled on the interface %s", __FUNCTION__, iif->if_name);
+        goto bad_hello;
+    }
+    if (!isis_interface_quality_to_send_hellos(iif)) {
+        /* Interface is not qualified to send hello packets*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Interface is not qualified to send hello packets %s", __FUNCTION__, iif->if_name);
+        goto bad_hello;
+    }
+    if (!IS_MAC_BROADCAST_ADDR(hello_eth_hdr->dst_mac.mac)) {
+        /* Dest MAC is not Broadcast address */
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Dest MAC is not Broadcast address", __FUNCTION__);
+        goto bad_hello;
+    }
+    
+    isis_pkt_hdr_t *hello_pkt_hdr = (isis_pkt_hdr_t*)GET_ETHERNET_HDR_PAYLOAD(hello_eth_hdr);
+    byte *hello_tlv_buffer = (byte*)(hello_pkt_hdr + 1);
+    size_t tlv_buff_size = pkt_size - ETH_HDR_SIZE_EXCL_PAYLOAD - sizeof(isis_pkt_hdr_t);
+    uint32_t *if_ip_addr_int = (uint32_t *)tlv_buffer_get_particular_tlv(hello_tlv_buffer, tlv_buff_size, ISIS_TLV_IF_IP, &intf_ip_len);
+
+    if (!if_ip_addr_int) {
+        /*IP TLV is missing in the packet*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: IP TLV is missing in the packet", __FUNCTION__);
+        goto bad_hello;
+    }
+
+    char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+    if (!is_same_subnet(IF_IP(iif), IF_MASK(iif), if_ip_addr_str)) {
+        /*Packet IP subnet is not matching with interface subnet.*/
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Packet IP subnet is not matching with interface subnet.", __FUNCTION__);
+        goto bad_hello;
+    }
+
+    isis_update_interface_adjacency_from_hello(iif, hello_tlv_buffer, tlv_buff_size);
+    ISIS_INCREMENT_INTF_STAT(iif, hello_pkt_rcv_cnt);
+    return;
+
+    bad_hello:
+        LOG(LOG_ERROR, ISIS_PKT, node, iif, "%s: Hello packet rejected, node=%s, iif=%s", __FUNCTION__, node->node_name, iif->if_name);
+        ISIS_INCREMENT_INTF_STAT(iif, hello_pkt_drp_cnt);
+}
+
+void 
+isis_process_lsp_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *lsp_eth_hdr, size_t pkt_size){
+
+}
+
+/*
+* Receive Hello Pkt or Receive LSP Pkt
+*/
 void isis_pkt_receive(void *arg, size_t arg_size) {
 #if 0
     printf("%s invoked \n", __FUNCTION__);
 #endif
+    pkt_notif_data_t*  pkt_notif_data = (pkt_notif_data_t*)arg;
+    node_t                      *node = pkt_notif_data->recv_node;
+    interface_t                  *iif = pkt_notif_data->recv_interface;
+    ethernet_hdr_t     *hello_eth_hdr = (ethernet_hdr_t*)pkt_notif_data->pkt;
+    uint32_t                 pkt_size = pkt_notif_data->pkt_size;
+
+    if (!isis_is_protocol_enable_on_node(node)) {
+        LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: ISIS is not enabled on the node", 
+            __FUNCTION__);
+        return;
+    }
+
+    isis_pkt_hdr_t *pkt_hdr = (isis_pkt_hdr_t*)GET_ETHERNET_HDR_PAYLOAD(hello_eth_hdr);
+    switch(pkt_hdr->isis_pkt_type) {
+        case ISIS_PTP_HELLO_PKT_TYPE:
+            isis_process_hello_pkt(node, iif, hello_eth_hdr, pkt_size);
+            break;
+        case ISIS_LSP_PKT_TYPE:
+            isis_process_lsp_pkt(node, iif, hello_eth_hdr, pkt_size);
+            break;
+    }
 }
 
 byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
@@ -20,11 +99,12 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
     uint32_t eth_hdr_payload_size = sizeof(isis_pkt_hdr_t) + 
                                     (TLV_OVERHEAD_SIZE * 6) +
                                     NODE_NAME_SIZE +
-                                    4+
-                                    4+
-                                    4+
-                                    4+
-                                    4;
+                                    4+ // ISIS_TLV_RTR_ID size in bytes
+                                    4+ // ISIS_TLV_IF_IP size in bytes
+                                    4+ // ISIS_TLV_IF_INDEX size in bytes
+                                    4+ // ISIS_TLV_HOLD_TIME size in bytes
+                                    4+ // ISIS_TLV_METRIC_VAL size in bytes
+                                    6; // ISIS_TLV_MAC_ADDR size in bytes
 
     *hello_pkt_size = ETH_HDR_SIZE_EXCL_PAYLOAD + eth_hdr_payload_size;
     
@@ -64,11 +144,15 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
     /*6. Insert interface cost*/
     uint32_t cost = ISIS_INTF_COST(intf);
     temp = tlv_buffer_insert_tlv(temp, ISIS_TLV_METRIC_VAL, 4, (byte *)&cost);
+
+    /*7. Insert interface mac*/
+    temp = tlv_buffer_insert_tlv(temp, ISIS_TLV_MAC_ADDR, 6, (byte*)&IF_MAC(intf));
+
     SET_COMMON_ETH_FCS(hello_eth_hdr, eth_hdr_payload_size, 0);
     
     char buffer[200];
     int len = isis_print_hello_pkt(buffer, hello_pkt_hdr, *hello_pkt_size);
-    printf("ISIS Hello Pkt Sends ==> %s\n", buffer);
+    printf("[%s]ISIS Hello Pkt Sends ==> %s\n", intf->if_name, buffer);
     return (byte*)hello_eth_hdr;
 }
 
@@ -79,6 +163,7 @@ typedef enum tlv_type_t{
     TLV_IF_INDEX,
     TLV_HOLD_TIME,
     TLV_METRIC_VAL,
+    TLV_IF_MAC,
     TLV_MAX
 }tlv_type;
 
@@ -88,50 +173,57 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
     uint8_t type;
     uint8_t len; 
     char *val;
-    char array[TLV_MAX][20];
+    char array[TLV_MAX][65];
     char str[INET_ADDRSTRLEN];
     char *isis_proto_type = "ISIS_PTP_HELLO_PKT_TYPE";
     ITERATE_TLV_BEGIN(tlv_buffer, type, len, val, pkt_size){
         switch(type){
             case ISIS_TLV_HOSTNAME:
-                sprintf(array[TLV_HOSTNAME], "%d %d %s", type, len, val);
+                sprintf(array[TLV_HOSTNAME], ":: %d %d %s", type, len, val);
                 break;
             case ISIS_TLV_RTR_ID:
                 memset(str, '\0', INET_ADDRSTRLEN);
                 sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
-                sprintf(array[TLV_RTR_ID], "%d %d %s", type, len, str);
+                sprintf(array[TLV_RTR_ID], ":: %d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_IP:
                 memset(str, '\0', INET_ADDRSTRLEN);
                 sprintf(str, "%d.%d.%d.%d", val[3], val[2], val[1], val[0]);
-                sprintf(array[TLV_IF_IP], "%d %d %s", type, len, str);
+                sprintf(array[TLV_IF_IP], ":: %d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_INDEX:
-                sprintf(array[TLV_IF_INDEX], "%d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_IF_INDEX], ":: %d %d %d", type, len, (int)*val);
                 break;
             case ISIS_TLV_HOLD_TIME:
-                sprintf(array[TLV_HOLD_TIME], "%d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_HOLD_TIME], ":: %d %d %d", type, len, (int)*val);
                 break;
             case ISIS_TLV_METRIC_VAL:
-                sprintf(array[TLV_METRIC_VAL], "%d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_METRIC_VAL], ":: %d %d %d", type, len, (int)*val);
+                break;
+            case ISIS_TLV_MAC_ADDR:
+                sprintf(array[TLV_IF_MAC], ":: %d %d %.2X:%.2X:%.2X:%.2X:%.2X:%.2X", type, len, 
+                        (unsigned char)val[0], (unsigned char)val[1], (unsigned char)val[2], 
+                        (unsigned char)val[3], (unsigned char)val[4], (unsigned char)val[5]);
+
                 break;
             default:
                 break;
         }
     }ITERATE_TLV_END(tlv_buffer, type, len, val, pkt_size)
 
-    sprintf(buff, "%s : %s :: %s :: %s :: %s :: %s :: %s",
-                                            isis_proto_type,
-                                            array[TLV_HOSTNAME],
-                                            array[TLV_RTR_ID],
-                                            array[TLV_IF_IP],
-                                            array[TLV_IF_INDEX],
-                                            array[TLV_HOLD_TIME],
-                                            array[TLV_METRIC_VAL]);
-    int total_len = strlen(isis_proto_type) + 4 +
+    sprintf(buff, "%s%s%s%s%s%s%s%s",
+                isis_proto_type,
+                array[TLV_HOSTNAME],
+                array[TLV_RTR_ID],
+                array[TLV_IF_IP],
+                array[TLV_IF_INDEX],
+                array[TLV_HOLD_TIME],
+                array[TLV_METRIC_VAL],
+                array[TLV_IF_MAC]);
+    int total_len = strlen(isis_proto_type) + 
                     strlen(array[TLV_HOSTNAME]) + strlen(array[TLV_RTR_ID]) + 
                     strlen(array[TLV_IF_IP]) + strlen(array[TLV_IF_INDEX]) + 
-                    strlen(array[TLV_HOLD_TIME]) + strlen(array[TLV_METRIC_VAL]) + 25;
+                    strlen(array[TLV_HOLD_TIME]) + strlen(array[TLV_METRIC_VAL]) + strlen(array[TLV_IF_MAC]);
     return total_len;
 }
 

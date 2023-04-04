@@ -3,6 +3,7 @@
 #include "isis_rtr.h"
 #include "isis_const.h"
 #include "isis_pkt.h"
+#include "isis_trace.h"
 
 static void
 isis_init_isis_intf_info(interface_t *intf_ptr) {
@@ -10,6 +11,7 @@ isis_init_isis_intf_info(interface_t *intf_ptr) {
     memset(intf_info_ptr, 0x0, sizeof(isis_intf_info_t));
     intf_info_ptr->cost = ISIS_DEFAULT_INTF_COST;
     intf_info_ptr->hello_interval = ISIS_DEFAULT_HELLO_INTERVAL;
+    intf_info_ptr->hello_transmission = false;
 }
 
 bool
@@ -64,6 +66,8 @@ isis_disable_protocol_on_interface(interface_t *intf) {
     }
 
     isis_stop_sending_hellos(intf);
+    /*Delete the adjacencies*/
+    isis_delete_adjacency(intf_info_ptr->adjacency);
     free(intf_info_ptr);
     intf->intf_nw_props.isis_intf_info = NULL;
 
@@ -83,12 +87,20 @@ isis_transmit_hello_cb(void *arg, uint32_t arg_size) {
     size_t hello_pkt_size = timer_data->data_size;
     
     send_pkt_out(hello_pkt, hello_pkt_size, intf);
-
+    ISIS_INCREMENT_INTF_STAT(intf, hello_pkt_snt_cnt);
     return;
 }
 
 void
 isis_start_sending_hellos(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+    
+    isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(intf);
+    if (!isis_intf_info) {
+        return;
+    }        
     size_t hello_pkt_size = 0;
 
     assert(ISIS_INTF_HELLO_XMIT_TIMER(intf) == NULL);
@@ -110,11 +122,21 @@ isis_start_sending_hellos(interface_t *intf) {
 
     ISIS_INTF_HELLO_XMIT_TIMER(intf) = timer_register_app_event(wt, isis_transmit_hello_cb, (void *)timer_data, 
                             sizeof(isis_timer_data_t), ISIS_INTF_HELLO_INTERVAL(intf) * 1000, 1);
+    ISIS_INTF_HELLO_TX_STATUS(intf) = true;
     return;
 }
 
 void
 isis_stop_sending_hellos(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+
+    isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(intf);
+    if (!isis_intf_info) {
+        return;
+    }    
+
     timer_event_handle *hello_xmit_timer = NULL;
     hello_xmit_timer = ISIS_INTF_HELLO_XMIT_TIMER(intf);
 
@@ -130,6 +152,7 @@ isis_stop_sending_hellos(interface_t *intf) {
     /** De Register **/
     timer_de_register_app_event(hello_xmit_timer);
     ISIS_INTF_HELLO_XMIT_TIMER(intf) = NULL;
+    ISIS_INTF_HELLO_TX_STATUS(intf) = false;
     return;
 }
 
@@ -141,4 +164,64 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
         return (true);
     }
     return (false);
+}
+
+void
+isis_print_intf_stats(interface_t *intf) {    
+        PRINT_TABS(5);
+        printf("Hello pkts rcvd : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_rcv_cnt));
+        PRINT_TABS(5);
+        printf("Hello pkts sent : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_snt_cnt));
+        PRINT_TABS(5);
+        printf("Hello pkts dropped : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_drp_cnt));
+}
+
+void 
+isis_show_interface_protocol_state(interface_t *intf) {
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+    if (intf_info_ptr) {
+        printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
+        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");    
+        printf("Stats:\n");
+        isis_print_intf_stats(intf);
+        printf("Adjacencies:\n");
+        isis_show_adjacency(intf_info_ptr->adjacency, 5);
+        printf("\n\n");
+    }
+    return;
+}
+
+/*
+* isis_clear_interface_protocol_adjacency()
+* The function free the resources allocated for adjacency for an interface
+*/
+void
+isis_clear_interface_protocol_adjacency(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+
+    if (!intf_info_ptr) {
+        return;
+    }
+    isis_delete_adjacency(intf_info_ptr->adjacency);
+    return;
+}
+
+/*
+*isis_update_interface_protocol_hello_interval()
+* The function is to update the hello interval time period for sending hello packet
+*/
+void
+isis_update_interface_protocol_hello_interval(interface_t *intf, uint32_t hello_interval) {
+    if (!intf) {
+        return;
+    }
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+    if (!intf_info_ptr) {
+        return;
+    }
+    intf_info_ptr->hello_interval = hello_interval;
+    return;         
 }

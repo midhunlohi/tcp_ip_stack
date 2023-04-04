@@ -11,7 +11,8 @@ typedef enum log_level_t {
 }log_level;
 
 typedef enum log_type_t {
-    ISIS_CONF,    
+    ISIS_CONF,
+    ISIS_PKT    
 }log_type;
 
 void LOG(log_level level, log_type type, node_t *node, interface_t *intf, ...);

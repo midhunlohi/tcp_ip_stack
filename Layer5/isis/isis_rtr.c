@@ -3,6 +3,7 @@
 #include "isis_intf.h"
 #include "isis_pkt.h"
 #include "isis_const.h"
+#include "isis_trace.h"
 
 bool
 isis_is_protocol_enable_on_node(node_t *node) {
@@ -16,12 +17,53 @@ isis_is_protocol_enable_on_node(node_t *node) {
 }
 
 void
+isis_show_node_protocol_interface_stats(node_t *node) {
+    interface_t *intf = NULL;
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+        if (isis_node_intf_is_enable(intf)) {
+            printf("%s : %s\n", intf->if_name, "Enabled");
+            isis_print_intf_stats(intf);
+        } else {
+            printf("%s : %s\n", intf->if_name, "Disabled");
+        }
+    }ITERATE_NODE_INTERFACES_END(node, intf);
+}
+
+void
 isis_show_node_protocol_state(node_t *node) {
     interface_t *intf = NULL;
-    printf("ÏSIS Protocol : %s\n", (isis_is_protocol_enable_on_node(node) == true)? "Ënabled" : "Disabled");
-    ITERATE_NODE_INTERFACES_BEGIN(node, intf){                       
-        printf("%s : %s\n", intf->if_name, isis_node_intf_is_enable(intf) == 1 ? "Enabled" : "Disabled");            
+    printf("ÏSIS Protocol : %s\n\n", (isis_is_protocol_enable_on_node(node) == true)? "Ënabled" : "Disabled");
+    printf("Adjacency Up Count : %d\n\n", ISIS_GET_NODE_STATS(node, adj_up_count));
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){        
+        printf("%s : %s\n", intf->if_name, isis_node_intf_is_enable(intf) == 1 ? "Enabled" : "Disabled");
+        isis_show_interface_protocol_state(intf);
     }ITERATE_NODE_INTERFACES_END(node, intf);
+}
+
+/*
+* isis_clear_node_protocol_adjacency()
+* Invoked when cmd 'clear node <node-name> protocol isis adjacencies' issued
+* The function deletes all adjacencies on all interfaces of a node, no matter in which state Adjacency is.
+* Note : Obviously Adjacencies shall reform again due to continuous reception of hello pkts.
+*/
+void
+isis_clear_node_protocol_adjacency(node_t *node) {
+    interface_t *intf = NULL;
+    if (!isis_is_protocol_enable_on_node(node)) {
+        printf("ÏSIS Protocol : Disabled\n\n");
+        return;
+    }
+    printf("ÏSIS Protocol : Enabled\n\n");
+    printf("Pre-clear adjacency up count : %d\n\n", ISIS_GET_NODE_STATS(node, adj_up_count));
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+        if (!isis_node_intf_is_enable(intf)) {
+            printf("%s : %s\n", intf->if_name, "Disabled");
+            continue;
+        }
+        printf("%s : %s\n", intf->if_name, "Enabled");
+        isis_clear_interface_protocol_adjacency(intf);
+    }ITERATE_NODE_INTERFACES_END(node, intf);
+    printf("Post-clear adjacency up count : %d\n\n", ISIS_GET_NODE_STATS(node, adj_up_count));
 }
 
 /*
