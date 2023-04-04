@@ -93,6 +93,14 @@ isis_transmit_hello_cb(void *arg, uint32_t arg_size) {
 
 void
 isis_start_sending_hellos(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+    
+    isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(intf);
+    if (!isis_intf_info) {
+        return;
+    }        
     size_t hello_pkt_size = 0;
 
     assert(ISIS_INTF_HELLO_XMIT_TIMER(intf) == NULL);
@@ -120,6 +128,15 @@ isis_start_sending_hellos(interface_t *intf) {
 
 void
 isis_stop_sending_hellos(interface_t *intf) {
+    if (!intf) {
+        return;
+    }
+
+    isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(intf);
+    if (!isis_intf_info) {
+        return;
+    }    
+
     timer_event_handle *hello_xmit_timer = NULL;
     hello_xmit_timer = ISIS_INTF_HELLO_XMIT_TIMER(intf);
 
@@ -190,4 +207,21 @@ isis_clear_interface_protocol_adjacency(interface_t *intf) {
     }
     isis_delete_adjacency(intf_info_ptr->adjacency);
     return;
+}
+
+/*
+*isis_update_interface_protocol_hello_interval()
+* The function is to update the hello interval time period for sending hello packet
+*/
+void
+isis_update_interface_protocol_hello_interval(interface_t *intf, uint32_t hello_interval) {
+    if (!intf) {
+        return;
+    }
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+    if (!intf_info_ptr) {
+        return;
+    }
+    intf_info_ptr->hello_interval = hello_interval;
+    return;         
 }

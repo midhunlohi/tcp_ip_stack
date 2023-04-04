@@ -56,4 +56,7 @@ isis_print_intf_stats(interface_t *intf);
 
 void
 isis_clear_interface_protocol_adjacency(interface_t *intf);
+
+void
+isis_update_interface_protocol_hello_interval(interface_t *intf, uint32_t hello);
 #endif

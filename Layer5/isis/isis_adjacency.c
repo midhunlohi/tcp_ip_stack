@@ -13,10 +13,11 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                                                 size_t tlv_buff_size) {
     bool new_adj = false;
     bool nbr_attr_changed = false;
+    bool nbr_hold_time_changed = false;
     uint8_t type;
     uint8_t len; 
     char *val;
-    isis_adjacency_t *adj = NULL;
+    isis_adjacency_t *adj = NULL;    
 
     isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(iif);
     if (!isis_intf_info) {
@@ -70,6 +71,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
             case ISIS_TLV_HOLD_TIME:
                 if (isis_intf_info->adjacency->hold_time != *(uint32_t*)val) {
                     nbr_attr_changed = true;
+                    nbr_hold_time_changed = true;
                     isis_intf_info->adjacency->hold_time = *(uint32_t*)val;
                 }
                 break;
@@ -93,6 +95,9 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
     if (!new_adj) {
         isis_adj_state_t next_state = isis_get_next_state(isis_intf_info->adjacency);
         isis_update_adjacency_state(isis_intf_info->adjacency, next_state);
+        if (nbr_hold_time_changed && isis_intf_info->adjacency->expiry_timer) {
+            isis_adjacency_refresh_expiry_timer(isis_intf_info->adjacency);
+        }
     }
 }
 
@@ -227,7 +232,7 @@ isis_adjacency_stop_expiry_timer(
     adj->expiry_timer = NULL;
 }
 
-static void 
+void
 isis_adjacency_refresh_expiry_timer(
     isis_adjacency_t *adj) {
     assert(adj->expiry_timer);

@@ -10,6 +10,7 @@
 #include "isis_intf.h"
 #include "isis_pkt.h"
 #include "isis_trace.h"
+#include "isis_const.h"
 
 typedef enum status_t{ 
     SUCCESS, 
@@ -95,6 +96,16 @@ isis_config_handler(param_t *param,
     return 0;
 }
 
+int
+hello_interval_validate(char *interval) {
+    uint32_t hello_interval = atoi(interval);
+    if (hello_interval <= 3 || hello_interval >= 100) {
+        printf("Error : Invalid Value, expected between 3 and 100\n");
+        return VALIDATION_FAILED;
+    }
+    return VALIDATION_SUCCESS;
+}
+
 /*
 * isis_interface_config_handler()
 * conf node <node-name> protocol isis interface all
@@ -115,14 +126,18 @@ isis_interface_config_handler(param_t *param,
     char *if_name       = NULL;
     node_t *node        = NULL;
     interface_t *intf   = NULL;
-
+    uint32_t hello_interval = ISIS_DEFAULT_HELLO_INTERVAL;
+    bool    hello_cmd = false;
     cmdcode = EXTRACT_CMD_CODE(tlv_buf);
-    
+
     TLV_LOOP_BEGIN(tlv_buf, tlv) {
         if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
             node_name = tlv->value;
         } else if (strncmp(tlv->leaf_id, "if-name", strlen("if-name")) == 0) {
-            if_name = tlv->value;
+            if_name = tlv->value;            
+        } else if (strncmp(tlv->leaf_id, "hello-interval", strlen("hello-interval")) == 0) {
+            hello_interval = atoi(tlv->value);
+            hello_cmd = true;            
         } else {
             assert(0);
         }
@@ -177,6 +192,25 @@ isis_interface_config_handler(param_t *param,
                 default:
                     break;
             }
+        case CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL_PARAM:
+            switch(enable_or_disable) {
+                case CONFIG_ENABLE:
+                    if (hello_cmd) {
+                        isis_update_interface_protocol_hello_interval(intf, hello_interval);
+                        isis_stop_sending_hellos(intf);
+                        isis_start_sending_hellos(intf);
+                    }
+                    break;
+                case CONFIG_DISABLE:
+                    if (hello_cmd) {
+                        isis_update_interface_protocol_hello_interval(intf, ISIS_DEFAULT_HELLO_INTERVAL);
+                        isis_stop_sending_hellos(intf);
+                        isis_start_sending_hellos(intf);
+                    }
+                    break;
+                default:
+                    break;      
+            }
     }
 
     return 0;
@@ -213,6 +247,22 @@ isis_config_cli_tree(param_t *param)
             init_param(&intf_name, LEAF, 0, isis_interface_config_handler, 0, STRING, "if-name", "interface name");
             libcli_register_param(&isis_interface, &intf_name);
             set_param_cmd_code(&intf_name, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF);
+            {
+                /*Register for cmd - conf node <node-name> protocol isis interface <if-name> hello-interval*/
+                static param_t hello_intrvl_cmd;
+                init_param(&hello_intrvl_cmd, CMD, "hello-interval", isis_interface_config_handler, 0, 
+                            INVALID, 0, "hello interval value");
+                libcli_register_param(&intf_name, &hello_intrvl_cmd);
+                set_param_cmd_code(&hello_intrvl_cmd, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL);
+                {
+                    /*Register for param - conf node <node-name> protocol isis interface <if-name> hello-interval <hello-interval-value>*/
+                    static param_t hello_intrvl_param;
+                    init_param(&hello_intrvl_param, LEAF, 0, isis_interface_config_handler, hello_interval_validate,
+                                INT, "hello-interval", "hello interval value");
+                    libcli_register_param(&hello_intrvl_cmd, &hello_intrvl_param);
+                    set_param_cmd_code(&hello_intrvl_param, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL_PARAM);
+                }
+            }
         }
     }
 
