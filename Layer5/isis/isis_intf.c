@@ -85,7 +85,7 @@ isis_transmit_hello_cb(void *arg, uint32_t arg_size) {
     interface_t *intf = timer_data->intf;
     byte *hello_pkt = (byte*)timer_data->data;
     size_t hello_pkt_size = timer_data->data_size;
-    
+    LOG(LOG_DEBUG, ISIS_PKT, intf->att_node, intf, ">>>> Hello out", hello_pkt);
     send_pkt_out(hello_pkt, hello_pkt_size, intf);
     ISIS_INCREMENT_INTF_STAT(intf, hello_pkt_snt_cnt);
     return;
@@ -120,6 +120,7 @@ isis_start_sending_hellos(interface_t *intf) {
     timer_data->data = (void*)hello_pkt;
     timer_data->data_size = hello_pkt_size;
 
+    isis_transmit_hello_cb((void *)timer_data, 0);
     ISIS_INTF_HELLO_XMIT_TIMER(intf) = timer_register_app_event(wt, isis_transmit_hello_cb, (void *)timer_data, 
                             sizeof(isis_timer_data_t), ISIS_INTF_HELLO_INTERVAL(intf) * 1000, 1);
     ISIS_INTF_HELLO_TX_STATUS(intf) = true;

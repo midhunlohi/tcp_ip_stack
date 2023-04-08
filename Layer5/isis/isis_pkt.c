@@ -152,7 +152,7 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
     
     char buffer[200];
     int len = isis_print_hello_pkt(buffer, hello_pkt_hdr, *hello_pkt_size);
-    printf("[%s]ISIS Hello Pkt Sends ==> %s\n", intf->if_name, buffer);
+    LOG(LOG_DEBUG, ISIS_PKT, intf->att_node, intf, buffer);
     return (byte*)hello_eth_hdr;
 }
 
@@ -192,13 +192,13 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
                 sprintf(array[TLV_IF_IP], ":: %d %d %s", type, len, str);
                 break;
             case ISIS_TLV_IF_INDEX:
-                sprintf(array[TLV_IF_INDEX], ":: %d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_IF_INDEX], ":: %d %d %d", type, len, *(uint32_t*)val);
                 break;
             case ISIS_TLV_HOLD_TIME:
-                sprintf(array[TLV_HOLD_TIME], ":: %d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_HOLD_TIME], ":: %d %d %d", type, len, *(uint32_t*)val);
                 break;
             case ISIS_TLV_METRIC_VAL:
-                sprintf(array[TLV_METRIC_VAL], ":: %d %d %d", type, len, (int)*val);
+                sprintf(array[TLV_METRIC_VAL], ":: %d %d %d", type, len, *(uint32_t*)val);
                 break;
             case ISIS_TLV_MAC_ADDR:
                 sprintf(array[TLV_IF_MAC], ":: %d %d %.2X:%.2X:%.2X:%.2X:%.2X:%.2X", type, len, 
