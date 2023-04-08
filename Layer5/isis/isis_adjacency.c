@@ -13,12 +13,10 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                                                 size_t tlv_buff_size) {
     bool new_adj = false;
     bool nbr_attr_changed = false;
-    bool nbr_hold_time_changed = false;
     uint8_t type;
     uint8_t len; 
     char *val;
     isis_adjacency_t *adj = NULL;    
-
     isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(iif);
     if (!isis_intf_info) {
         LOG(LOG_ERROR, ISIS_PKT, iif->att_node, iif, "%s: Invalid isis interface info pointer", 
@@ -71,7 +69,6 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
             case ISIS_TLV_HOLD_TIME:
                 if (isis_intf_info->adjacency->hold_time != *(uint32_t*)val) {
                     nbr_attr_changed = true;
-                    nbr_hold_time_changed = true;
                     isis_intf_info->adjacency->hold_time = *(uint32_t*)val;
                 }
                 break;
@@ -95,9 +92,6 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
     if (!new_adj) {
         isis_adj_state_t next_state = isis_get_next_state(isis_intf_info->adjacency);
         isis_update_adjacency_state(isis_intf_info->adjacency, next_state);
-        if (nbr_hold_time_changed && isis_intf_info->adjacency->expiry_timer) {
-            isis_adjacency_refresh_expiry_timer(isis_intf_info->adjacency);
-        }
     }
 }
 
@@ -288,6 +282,8 @@ isis_update_adjacency_state(
         return;
     }
     isis_adj_state_t cur_state = adj->adj_state;
+    LOG(LOG_DEBUG, ISIS_ADJ, adj->intf->att_node, adj->intf, "neigh :%s %s ==> %s", adj->nbr_name, 
+        isis_adj_state_str(cur_state), isis_adj_state_str(new_state));
     switch(cur_state) {
         case ISIS_ADJ_STATE_DOWN: 
             {
