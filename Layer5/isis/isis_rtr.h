@@ -42,4 +42,7 @@ isis_clear_node_protocol_adjacency(node_t *node);
 
 void
 isis_show_node_protocol_single_interface_stats(node_t*,char*);
+
+void 
+isis_check_delete_node_info(node_t *node);
 #endif

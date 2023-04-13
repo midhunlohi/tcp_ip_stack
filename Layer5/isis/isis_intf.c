@@ -55,22 +55,37 @@ isis_enable_protocol_on_interface(interface_t *intf) {
     return 0;
 }
 
+/*
+* isis_check_and_delete_intf_info()
+* Assert if the interface pointer holds valid objects
+*/
+static void 
+isis_check_and_delete_intf_info(interface_t *intf) {
+    isis_intf_info_t *intf_info_ptr = NULL;
+    intf_info_ptr = ISIS_INTF_INFO(intf);
+    assert(!intf_info_ptr->adjacency);
+    assert(!intf_info_ptr->hello_xmit_timer);
+    free(intf->intf_nw_props.isis_intf_info);
+    intf->intf_nw_props.isis_intf_info = NULL;
+    return;
+}
+
+/*
+* isis_disable_protocol_on_interface()
+* Free the resources associated with the interface data structure.
+*/
 int
 isis_disable_protocol_on_interface(interface_t *intf) {
     isis_intf_info_t *intf_info_ptr = NULL;
-
     intf_info_ptr = ISIS_INTF_INFO(intf);
     if (!intf_info_ptr) {
         printf("protocol is already disabled on this interface.\n");
         return -1;
     }
-
     isis_stop_sending_hellos(intf);
     /*Delete the adjacencies*/
     isis_delete_adjacency(intf_info_ptr->adjacency);
-    free(intf_info_ptr);
-    intf->intf_nw_props.isis_intf_info = NULL;
-
+    isis_check_and_delete_intf_info(intf);
     return 0;
 }
 

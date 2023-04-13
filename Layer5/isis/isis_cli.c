@@ -19,7 +19,6 @@ typedef enum status_t{
 
 static void
 isis_init(node_t *node) {
-    printf("%s Invoked \n", __FUNCTION__);
     isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
     if (isis_node_info) {
         printf("%s, ISIS Protocol is already ENABLED on this node\n", __FUNCTION__);
@@ -35,17 +34,20 @@ isis_init(node_t *node) {
 
 static void
 isis_de_init(node_t *node) {
-    printf("%s Invoked \n", __FUNCTION__);
     isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
     if (NULL == isis_node_info) {
         printf("%s, ISIS protocol is already DISABLED on this node.\n", __FUNCTION__);
         return;
     }
 
-    free(isis_node_info);
-    node->node_nw_prop.isis_node_info = NULL;
+    interface_t *intf = NULL;        
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+        isis_disable_protocol_on_interface(intf);
+    }ITERATE_NODE_INTERFACES_END(node, intf);
+
+    isis_check_delete_node_info(node);    
     tcp_stack_de_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
-    printf("%s, ISIS protocol is DISABLED this node.\n", __FUNCTION__);
+    printf("%s, ISIS protocol is DISABLED in this node.\n", __FUNCTION__);
     return;
 }
 
