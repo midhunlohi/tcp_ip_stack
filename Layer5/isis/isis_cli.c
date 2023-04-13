@@ -331,12 +331,15 @@ isis_show_handler(param_t *param,
     tlv_struct_t *tlv   = NULL;
     char *node_name     = NULL;
     node_t *node        = NULL;
-    
+    char *if_name       = NULL;
+
     cmdcode = EXTRACT_CMD_CODE(tlv_buf);
     
     TLV_LOOP_BEGIN(tlv_buf, tlv) {
         if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
             node_name = tlv->value;
+        } else if (strncmp(tlv->leaf_id, "if-name", strlen("if-name")) == 0) {
+            if_name = tlv->value;        
         } else {
             assert(0);
         }
@@ -350,6 +353,9 @@ isis_show_handler(param_t *param,
             break;
         case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS:
             isis_show_node_protocol_interface_stats(node);
+            break;
+        case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_SINGLE_INTF_STATS:
+            isis_show_node_protocol_single_interface_stats(node, if_name);
             break;
         default:
             break;
@@ -369,12 +375,20 @@ isis_show_cli_tree(param_t *param) {
         libcli_register_param(param, &isis_proto);
         set_param_cmd_code(&isis_proto, CMDCODE_SHOW_NODE_ISIS_PROTOCOL);
         {
+            /*show node <node-name> protocol isis interface*/
             static param_t interface_stats;
             init_param(&interface_stats, CMD, "interface", isis_show_handler, 0, INVALID, 0, "interface statistics");
             libcli_register_param(&isis_proto, &interface_stats);
             set_param_cmd_code(&interface_stats, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS);
+            {
+                /*show node <node-name> protocol isis interface <interface-name>*/
+                static param_t intf_name;
+                init_param(&intf_name, LEAF, 0, isis_show_handler, 0, STRING, "if-name", "interface name");
+                libcli_register_param(&interface_stats, &intf_name);
+                set_param_cmd_code(&intf_name, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_SINGLE_INTF_STATS);
+            }
         }
-    }
+    }    
     return 0;
 }
 

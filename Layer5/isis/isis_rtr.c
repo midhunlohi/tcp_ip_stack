@@ -16,6 +16,29 @@ isis_is_protocol_enable_on_node(node_t *node) {
     }
 }
 
+/*
+* isis_show_node_protocol_single_interface_stats()
+* show interface stats
+*/
+void
+isis_show_node_protocol_single_interface_stats(node_t *node, char *name) {
+    interface_t *intf = NULL;    
+    if (isis_is_protocol_enable_on_node(node) == true) {
+        printf("%s: ÏSIS Protocol : %s\n\n", node->node_name, "Enabled");
+        ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+            if (!strcmp(name, intf->if_name)) {
+                printf("%s : %s\n", intf->if_name, isis_node_intf_is_enable(intf) == 1 ? "Enabled" : "Disabled");
+                isis_show_interface_protocol_state(intf);
+                return;
+            }
+        }ITERATE_NODE_INTERFACES_END(node, intf);
+        printf("%s is invalid\n", name);
+    } else {
+        printf("%s:ÏSIS Protocol : %s\n\n", node->node_name, "Disabled");
+    }
+    return;
+}
+
 void
 isis_show_node_protocol_interface_stats(node_t *node) {
     interface_t *intf = NULL;
