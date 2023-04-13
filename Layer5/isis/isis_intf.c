@@ -168,23 +168,46 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
 }
 
 void
+isis_print_drop_stats(interface_t *intf) {
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);    
+    PRINT_TABS(5);
+    printf("ISIS_PROTO_NOT_ENABLED : %d\n", intf_info_ptr->drop_stats[ISIS_PROTO_NOT_ENABLED]);
+    PRINT_TABS(5);
+    printf("INTF_NOT_QUALIFIED : %d\n", intf_info_ptr->drop_stats[INTF_NOT_QUALIFIED]);
+    PRINT_TABS(5);
+    printf("DEST_MAC_IS_NOT_BCAST : %d\n", intf_info_ptr->drop_stats[DEST_MAC_IS_NOT_BCAST]);
+    PRINT_TABS(5);
+    printf("IP_TLV_MISSING : %d\n", intf_info_ptr->drop_stats[IP_TLV_MISSING]);
+    PRINT_TABS(5);
+    printf("IP_SUBNET_MISMATCH : %d\n", intf_info_ptr->drop_stats[IP_SUBNET_MISMATCH]);
+    PRINT_TABS(5);
+    printf("AUTH_DISABLED : %d\n", intf_info_ptr->drop_stats[AUTH_DISABLED]);
+    PRINT_TABS(5);
+    printf("AUTH_MISMATCH : %d\n", intf_info_ptr->drop_stats[AUTH_MISMATCH]);
+}
+
+void
 isis_print_intf_stats(interface_t *intf) {    
-        PRINT_TABS(5);
-        printf("Hello pkts rcvd : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_rcv_cnt));
-        PRINT_TABS(5);
-        printf("Hello pkts sent : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_snt_cnt));
-        PRINT_TABS(5);
-        printf("Hello pkts dropped : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_drp_cnt));
+    PRINT_TABS(5);
+    printf("Hello pkts rcvd : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_rcv_cnt));
+    PRINT_TABS(5);
+    printf("Hello pkts sent : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_snt_cnt));
+    PRINT_TABS(5);
+    printf("Hello pkts dropped : %d\n", ISIS_GET_INTF_STAT(intf, hello_pkt_drp_cnt));
 }
 
 void 
 isis_show_interface_protocol_state(interface_t *intf) {
     isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
     if (intf_info_ptr) {
-        printf("hello interval : %d sec, Intf Cost : %d\n", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
-        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");    
+        printf("hello interval : %d sec, Intf Cost : %d, ", ISIS_INTF_HELLO_INTERVAL(intf), ISIS_INTF_COST(intf));
+        printf("authentication : %s\n", 
+                intf_info_ptr->authentication.auth_enable ? intf_info_ptr->authentication.password : "OFF");
+        printf("hello transmission : %s\n", ISIS_INTF_HELLO_TX_STATUS(intf) ? "On" : "Off");
         printf("Stats:\n");
         isis_print_intf_stats(intf);
+        printf("Drop Stats:\n");
+        isis_print_drop_stats(intf);
         printf("Adjacencies:\n");
         isis_show_adjacency(intf_info_ptr->adjacency, 5);
         printf("\n\n");
@@ -224,5 +247,40 @@ isis_update_interface_protocol_hello_interval(interface_t *intf, uint32_t hello_
         return;
     }
     intf_info_ptr->hello_interval = hello_interval;
+    return;         
+}
+
+/*
+* isis_interface_refresh_hellos()
+* The function to restart the send hello packet
+*/
+void
+isis_interface_refresh_hellos(interface_t* intf) {
+    if (!intf) {
+        return;
+    }
+    isis_stop_sending_hellos(intf);
+    isis_start_sending_hellos(intf);
+}
+
+/*
+*isis_update_interface_protocol_hello_interval()
+* The function is to update the hello interval time period for sending hello packet
+*/
+void
+isis_update_interface_protocol_authentication(interface_t *intf, char* password) {
+    if (!intf) {
+        return;
+    }
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+    if (!intf_info_ptr) {
+        return;
+    }
+    if (!password) {
+        intf_info_ptr->authentication.auth_enable = false;
+        return;
+    }
+    intf_info_ptr->authentication.auth_enable = true;
+    strncpy(intf_info_ptr->authentication.password, password, AUTH_PASSWD_LEN);
     return;         
 }
