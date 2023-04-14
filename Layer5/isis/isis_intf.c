@@ -299,3 +299,125 @@ isis_update_interface_protocol_authentication(interface_t *intf, char* password)
     strncpy(intf_info_ptr->authentication.password, password, AUTH_PASSWD_LEN);
     return;         
 }
+
+/*
+* isis_handle_intf_up_down()
+* Handle interface up/down notification
+*/
+void
+isis_handle_intf_up_down(interface_t *intf, bool old_status) {
+    /*Interface is coming up*/
+    if (old_status == false) {
+        LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+            "Comes up");
+        if (!isis_interface_quality_to_send_hellos(intf)) {
+            LOG(LOG_WARN, ISIS_IF_UPD, intf->att_node, intf, 
+                "Interface is not qualified to send hellos");
+            return;
+        }
+        isis_start_sending_hellos(intf);
+    } else {
+        /*Interface is going down*/
+        LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+            "Goes down");
+        isis_stop_sending_hellos(intf);
+        isis_clear_interface_protocol_adjacency(intf);
+    }
+    return;
+}
+
+/*isis_handle_intf_addr_change()
+* Handle interface address change notification
+*/
+void
+isis_handle_intf_addr_change(interface_t *intf, 
+                            uint32_t old_ip, uint8_t mask) {
+    /*New address added*/
+    if (IF_IP_EXIST(intf) && !old_ip && !mask) {
+        LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+            "New IP address added");
+        if (isis_interface_quality_to_send_hellos(intf)) {
+            isis_start_sending_hellos(intf);
+        }
+    } else if (!IF_IP_EXIST(intf) && old_ip && mask) {
+        LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+            "Removed existing IP address");
+        /*Removed existing address*/
+        isis_stop_sending_hellos(intf);
+        isis_clear_interface_protocol_adjacency(intf);
+    } else if (tcp_ip_covert_ip_p_to_n(IF_IP(intf)) != old_ip) {
+        /*Updates the address*/
+        LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+            "Updates existing IP address");
+        if (isis_interface_quality_to_send_hellos(intf)) {
+            isis_interface_refresh_hellos(intf);
+        } else {
+            isis_stop_sending_hellos(intf);
+        }
+    }
+    return;
+}
+
+/*
+*isis_interface_updates()
+* Receive the interface updates and reflect on it.
+*/
+void
+isis_interface_updates(void *arg, size_t arg_size) {
+    intf_notif_data_t* intf_notif_data          = NULL;
+    uint32_t            flags                   = 0x0;
+    interface_t         *intf                   = NULL;
+    intf_prop_changed_t *old_intf_prop_changed  = NULL;
+    if (!arg) {
+        return;
+    }
+    intf_notif_data = (intf_notif_data_t*)arg;
+    flags = intf_notif_data->change_flags;
+    intf  = intf_notif_data->interface;
+    old_intf_prop_changed = intf_notif_data->old_intf_prop_changed;
+
+    if (!isis_node_intf_is_enable(intf)) {
+        LOG(LOG_WARN, ISIS_IF_UPD, intf->att_node, intf, 
+            "ISIS proto not enabled on interface");
+        return;
+    }
+    switch(flags) {
+        case IF_UP_DOWN_CHANGE_F:
+            {
+                LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+                "up/down notification receives");
+                isis_handle_intf_up_down(intf,
+                            old_intf_prop_changed->up_status);
+            }
+            break;
+        case IF_IP_ADDR_CHANGE_F:
+            {
+                LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+                "IP address change notif receives");
+                isis_handle_intf_addr_change(
+                            intf, 
+                            old_intf_prop_changed->ip_addr.ip_addr,
+                            old_intf_prop_changed->ip_addr.mask);
+            }
+            break;
+        case IF_OPER_MODE_CHANGE_F:
+            {
+                LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+                "Oper mode change notif receives");                
+            }
+            break;
+        case IF_VLAN_MEMBERSHIP_CHANGE_F:
+            {
+                LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+                "VLAN membership change notif receives");
+            }
+            break;
+        case IF_METRIC_CHANGE_F:
+            {
+                LOG(LOG_DEBUG, ISIS_IF_UPD, intf->att_node, intf, 
+                "Metric change notif receives");
+            }
+            break;
+    }
+    return;
+}

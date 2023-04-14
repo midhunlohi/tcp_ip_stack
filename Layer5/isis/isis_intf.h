@@ -85,4 +85,7 @@ isis_interface_refresh_hellos(interface_t*);
 
 void
 isis_update_interface_protocol_authentication(interface_t*, char*);
+
+void
+isis_interface_updates(void *, size_t);
 #endif

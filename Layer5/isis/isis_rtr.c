@@ -112,5 +112,7 @@ isis_clear_node_protocol_adjacency(node_t *node) {
 */
 void
 isis_one_time_registation(void) {
+    /*Regiter for interface updates*/
+    nfc_intf_register_for_events(isis_interface_updates);
     nfc_register_for_pkt_tracing(ISIS_ETH_PKT_TYPE, isis_print_pkt);
 }

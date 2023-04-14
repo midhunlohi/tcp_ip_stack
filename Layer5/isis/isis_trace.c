@@ -11,6 +11,8 @@ char
             return "ISIS(PKT)";
         case ISIS_ADJ:
             return "ISIS(ADJ)";
+        case ISIS_IF_UPD:
+            return "ISIS(IF_UPD)";
         default:
             break;
     }
