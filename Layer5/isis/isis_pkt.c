@@ -15,19 +15,32 @@ bool isis_pkt_trap_rule(char *pkt, size_t pkt_size) {
 void 
 isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth_hdr, size_t pkt_size){
     uint8_t intf_ip_len = 0;
+    uint8_t password_len = 0;
+    
+    isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(iif);
+
     if (!isis_node_intf_is_enable(iif)) {
         /* ISIS protocol is not enabled on the interface on the node*/
         LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: ISIS protocol is not enabled on the interface %s", __FUNCTION__, iif->if_name);
+        if (isis_intf_info) {
+            isis_intf_info->drop_stats[ISIS_PROTO_NOT_ENABLED]++;
+        }
         goto bad_hello;
     }
     if (!isis_interface_quality_to_send_hellos(iif)) {
         /* Interface is not qualified to send hello packets*/
         LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Interface is not qualified to send hello packets %s", __FUNCTION__, iif->if_name);
+        if (isis_intf_info) {
+            isis_intf_info->drop_stats[INTF_NOT_QUALIFIED]++;
+        }
         goto bad_hello;
     }
     if (!IS_MAC_BROADCAST_ADDR(hello_eth_hdr->dst_mac.mac)) {
         /* Dest MAC is not Broadcast address */
         LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Dest MAC is not Broadcast address", __FUNCTION__);
+        if (isis_intf_info) {
+            isis_intf_info->drop_stats[DEST_MAC_IS_NOT_BCAST]++;
+        }
         goto bad_hello;
     }
     
@@ -39,6 +52,9 @@ isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth
     if (!if_ip_addr_int) {
         /*IP TLV is missing in the packet*/
         LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: IP TLV is missing in the packet", __FUNCTION__);
+        if (isis_intf_info) {
+            isis_intf_info->drop_stats[IP_TLV_MISSING]++;
+        }
         goto bad_hello;
     }
 
@@ -46,9 +62,37 @@ isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth
     if (!is_same_subnet(IF_IP(iif), IF_MASK(iif), if_ip_addr_str)) {
         /*Packet IP subnet is not matching with interface subnet.*/
         LOG(LOG_WARN, ISIS_PKT, node, iif, "%s: Packet IP subnet is not matching with interface subnet.", __FUNCTION__);
+        if (isis_intf_info) {
+            isis_intf_info->drop_stats[IP_SUBNET_MISMATCH]++;
+        }
         goto bad_hello;
     }
 
+    char *password = tlv_buffer_get_particular_tlv(hello_tlv_buffer, tlv_buff_size, ISIS_TLV_AUTH, &password_len);
+    if (!password && !password_len) {
+        LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "password is EMPTY");
+    } else {
+        LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "password is %s", password);
+        if (!isis_intf_info->authentication.auth_enable) {
+            LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "Auth is not enabled");
+            isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN);
+            if (isis_intf_info) {
+                isis_intf_info->drop_stats[AUTH_DISABLED]++;
+            }
+            goto bad_hello;
+        } else {
+            if (memcmp(isis_intf_info->authentication.password, password, AUTH_PASSWD_LEN)) {
+                LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "Auth is not MATCHING");
+                isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN);
+                if (isis_intf_info) {
+                    isis_intf_info->drop_stats[AUTH_MISMATCH]++;
+                }
+                goto bad_hello;
+            } else {
+                LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "Auth is MATCHING :-)");
+            }    
+        }        
+    }
     isis_update_interface_adjacency_from_hello(iif, hello_tlv_buffer, tlv_buff_size);
     ISIS_INCREMENT_INTF_STAT(iif, hello_pkt_rcv_cnt);
     return;
@@ -105,7 +149,14 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
                                     4+ // ISIS_TLV_HOLD_TIME size in bytes
                                     4+ // ISIS_TLV_METRIC_VAL size in bytes
                                     6; // ISIS_TLV_MAC_ADDR size in bytes
-
+    isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
+    if (!intf_info_ptr) {
+        printf("Error: intf_info_ptr is NULL\n");
+        return NULL;
+    }
+    if (intf_info_ptr->authentication.auth_enable) {
+        eth_hdr_payload_size += AUTH_PASSWD_LEN;
+    }
     *hello_pkt_size = ETH_HDR_SIZE_EXCL_PAYLOAD + eth_hdr_payload_size;
     
     /* Prepare ethernet header*/
@@ -148,6 +199,11 @@ byte* isis_prepare_hello_pkt(interface_t *intf, size_t *hello_pkt_size) {
     /*7. Insert interface mac*/
     temp = tlv_buffer_insert_tlv(temp, ISIS_TLV_MAC_ADDR, 6, (byte*)&IF_MAC(intf));
 
+    /*8. Inser auth password*/
+    if (intf_info_ptr->authentication.auth_enable) {
+        temp = tlv_buffer_insert_tlv(temp, ISIS_TLV_AUTH, 32, intf_info_ptr->authentication.password);
+    }
+
     SET_COMMON_ETH_FCS(hello_eth_hdr, eth_hdr_payload_size, 0);
     
     char buffer[200];
@@ -164,6 +220,7 @@ typedef enum tlv_type_t{
     TLV_HOLD_TIME,
     TLV_METRIC_VAL,
     TLV_IF_MAC,
+    TLV_IF_AUTH,
     TLV_MAX
 }tlv_type;
 
@@ -206,12 +263,15 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
                         (unsigned char)val[3], (unsigned char)val[4], (unsigned char)val[5]);
 
                 break;
+            case ISIS_TLV_AUTH:
+                sprintf(array[TLV_IF_AUTH], ":: %d %d %s", type, len, val);
+                break;
             default:
                 break;
         }
     }ITERATE_TLV_END(tlv_buffer, type, len, val, pkt_size)
 
-    sprintf(buff, "%s%s%s%s%s%s%s%s",
+    sprintf(buff, "%s%s%s%s%s%s%s%s%s",
                 isis_proto_type,
                 array[TLV_HOSTNAME],
                 array[TLV_RTR_ID],
@@ -219,11 +279,13 @@ isis_print_hello_pkt(byte *buff, isis_pkt_hdr_t *hello_pkt_hdr, uint32_t pkt_siz
                 array[TLV_IF_INDEX],
                 array[TLV_HOLD_TIME],
                 array[TLV_METRIC_VAL],
-                array[TLV_IF_MAC]);
+                array[TLV_IF_MAC],
+                array[TLV_IF_AUTH]);
     int total_len = strlen(isis_proto_type) + 
                     strlen(array[TLV_HOSTNAME]) + strlen(array[TLV_RTR_ID]) + 
                     strlen(array[TLV_IF_IP]) + strlen(array[TLV_IF_INDEX]) + 
-                    strlen(array[TLV_HOLD_TIME]) + strlen(array[TLV_METRIC_VAL]) + strlen(array[TLV_IF_MAC]);
+                    strlen(array[TLV_HOLD_TIME]) + strlen(array[TLV_METRIC_VAL]) + 
+                    strlen(array[TLV_IF_MAC]) + strlen(array[TLV_IF_AUTH]);
     return total_len;
 }
 

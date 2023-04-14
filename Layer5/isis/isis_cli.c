@@ -19,7 +19,6 @@ typedef enum status_t{
 
 static void
 isis_init(node_t *node) {
-    printf("%s Invoked \n", __FUNCTION__);
     isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
     if (isis_node_info) {
         printf("%s, ISIS Protocol is already ENABLED on this node\n", __FUNCTION__);
@@ -35,17 +34,20 @@ isis_init(node_t *node) {
 
 static void
 isis_de_init(node_t *node) {
-    printf("%s Invoked \n", __FUNCTION__);
     isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
     if (NULL == isis_node_info) {
         printf("%s, ISIS protocol is already DISABLED on this node.\n", __FUNCTION__);
         return;
     }
 
-    free(isis_node_info);
-    node->node_nw_prop.isis_node_info = NULL;
+    interface_t *intf = NULL;        
+    ITERATE_NODE_INTERFACES_BEGIN(node, intf){
+        isis_disable_protocol_on_interface(intf);
+    }ITERATE_NODE_INTERFACES_END(node, intf);
+
+    isis_check_delete_node_info(node);    
     tcp_stack_de_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
-    printf("%s, ISIS protocol is DISABLED this node.\n", __FUNCTION__);
+    printf("%s, ISIS protocol is DISABLED in this node.\n", __FUNCTION__);
     return;
 }
 
@@ -107,6 +109,19 @@ hello_interval_validate(char *interval) {
 }
 
 /*
+* authentication_string_validate()
+* Function to validate the authentication password string
+*/
+int
+authentication_string_validate(char *string) {
+    if (strlen(string) >= 32) {
+        printf("Error : Invalid Value, expected a string with < 32 bytes size\n");
+        return VALIDATION_FAILED;
+    }
+    return VALIDATION_SUCCESS;
+}
+
+/*
 * isis_interface_config_handler()
 * conf node <node-name> protocol isis interface all
 * isis_config_handler() - The function to handle the confiuguration of ISIS protocol.
@@ -120,14 +135,16 @@ isis_interface_config_handler(param_t *param,
                     ser_buff_t *tlv_buf,
                     op_mode enable_or_disable)
 {
-    int cmdcode         = -1;
-    tlv_struct_t *tlv   = NULL;
-    char *node_name     = NULL;
-    char *if_name       = NULL;
-    node_t *node        = NULL;
-    interface_t *intf   = NULL;
-    uint32_t hello_interval = ISIS_DEFAULT_HELLO_INTERVAL;
-    bool    hello_cmd = false;
+    int         cmdcode         = -1;
+    tlv_struct_t *tlv           = NULL;
+    char        *node_name      = NULL;
+    char        *if_name        = NULL;
+    node_t      *node           = NULL;
+    interface_t *intf           = NULL;
+    uint32_t    hello_interval  = ISIS_DEFAULT_HELLO_INTERVAL;
+    bool        hello_cmd       = false;
+    bool        auth_cmd        = false;
+    char        password[AUTH_PASSWD_LEN];
     cmdcode = EXTRACT_CMD_CODE(tlv_buf);
 
     TLV_LOOP_BEGIN(tlv_buf, tlv) {
@@ -137,7 +154,10 @@ isis_interface_config_handler(param_t *param,
             if_name = tlv->value;            
         } else if (strncmp(tlv->leaf_id, "hello-interval", strlen("hello-interval")) == 0) {
             hello_interval = atoi(tlv->value);
-            hello_cmd = true;            
+            hello_cmd = true;
+        } else if(strncmp(tlv->leaf_id, "authentication", strlen("authentication")) == 0) {
+            strncpy(password, tlv->value, AUTH_PASSWD_LEN);
+            auth_cmd = true;
         } else {
             assert(0);
         }
@@ -197,15 +217,30 @@ isis_interface_config_handler(param_t *param,
                 case CONFIG_ENABLE:
                     if (hello_cmd) {
                         isis_update_interface_protocol_hello_interval(intf, hello_interval);
-                        isis_stop_sending_hellos(intf);
-                        isis_start_sending_hellos(intf);
+                        isis_interface_refresh_hellos(intf);
                     }
                     break;
                 case CONFIG_DISABLE:
                     if (hello_cmd) {
                         isis_update_interface_protocol_hello_interval(intf, ISIS_DEFAULT_HELLO_INTERVAL);
-                        isis_stop_sending_hellos(intf);
-                        isis_start_sending_hellos(intf);
+                        isis_interface_refresh_hellos(intf);
+                    }
+                    break;
+                default:
+                    break;      
+            }
+        case CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_AUTH_PARAM:
+            switch(enable_or_disable) {
+                case CONFIG_ENABLE:
+                    if (auth_cmd) {
+                        isis_update_interface_protocol_authentication(intf, password);
+                        isis_interface_refresh_hellos(intf);
+                    }
+                    break;
+                case CONFIG_DISABLE:
+                    if (auth_cmd) {
+                        isis_update_interface_protocol_authentication(intf, NULL);
+                        isis_interface_refresh_hellos(intf);
                     }
                     break;
                 default:
@@ -263,6 +298,22 @@ isis_config_cli_tree(param_t *param)
                     set_param_cmd_code(&hello_intrvl_param, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_HELLO_INTERVAL_PARAM);
                 }
             }
+            {
+                /*Register for cmd - conf node <node-name> protocol isis interface <if-name> authentication*/
+                static param_t auth_cmd;
+                init_param(&auth_cmd, CMD, "authentication", isis_interface_config_handler, 0, 
+                            INVALID, 0, "password");
+                libcli_register_param(&intf_name, &auth_cmd);
+                set_param_cmd_code(&auth_cmd, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_AUTH_CMD);
+                {
+                    /*Register for param - conf node <node-name> protocol isis interface <if-name> authentication <password>*/
+                    static param_t auth_param;
+                    init_param(&auth_param, LEAF, 0, isis_interface_config_handler, authentication_string_validate,
+                                STRING, "authentication", "password");
+                    libcli_register_param(&auth_cmd, &auth_param);
+                    set_param_cmd_code(&auth_param, CMDCODE_CONF_NODE_ISIS_PROTOCOL_INTF_AUTH_PARAM);
+                }
+            }
         }
     }
 
@@ -282,12 +333,15 @@ isis_show_handler(param_t *param,
     tlv_struct_t *tlv   = NULL;
     char *node_name     = NULL;
     node_t *node        = NULL;
-    
+    char *if_name       = NULL;
+
     cmdcode = EXTRACT_CMD_CODE(tlv_buf);
     
     TLV_LOOP_BEGIN(tlv_buf, tlv) {
         if (strncmp(tlv->leaf_id, "node-name", strlen("node-name")) == 0) {
             node_name = tlv->value;
+        } else if (strncmp(tlv->leaf_id, "if-name", strlen("if-name")) == 0) {
+            if_name = tlv->value;        
         } else {
             assert(0);
         }
@@ -301,6 +355,9 @@ isis_show_handler(param_t *param,
             break;
         case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS:
             isis_show_node_protocol_interface_stats(node);
+            break;
+        case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_SINGLE_INTF_STATS:
+            isis_show_node_protocol_single_interface_stats(node, if_name);
             break;
         default:
             break;
@@ -320,12 +377,20 @@ isis_show_cli_tree(param_t *param) {
         libcli_register_param(param, &isis_proto);
         set_param_cmd_code(&isis_proto, CMDCODE_SHOW_NODE_ISIS_PROTOCOL);
         {
+            /*show node <node-name> protocol isis interface*/
             static param_t interface_stats;
             init_param(&interface_stats, CMD, "interface", isis_show_handler, 0, INVALID, 0, "interface statistics");
             libcli_register_param(&isis_proto, &interface_stats);
             set_param_cmd_code(&interface_stats, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_INTF_STATS);
+            {
+                /*show node <node-name> protocol isis interface <interface-name>*/
+                static param_t intf_name;
+                init_param(&intf_name, LEAF, 0, isis_show_handler, 0, STRING, "if-name", "interface name");
+                libcli_register_param(&interface_stats, &intf_name);
+                set_param_cmd_code(&intf_name, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_SINGLE_INTF_STATS);
+            }
         }
-    }
+    }    
     return 0;
 }
 

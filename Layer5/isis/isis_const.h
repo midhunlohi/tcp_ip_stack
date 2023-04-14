@@ -23,5 +23,7 @@
 #define ISIS_TLV_METRIC_VAL 6
 #define ISIS_TLV_IF_INDEX   4 // As per standard
 #define ISIS_TLV_MAC_ADDR   112
-
+#define ISIS_TLV_AUTH       10
+#define AUTH_PASSWD_LEN     32
+#define DRP_STATS_ARR_LEN   20
 #endif
