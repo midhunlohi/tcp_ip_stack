@@ -8,7 +8,27 @@
 static void
 isis_adjacency_start_delete_timer(isis_adjacency_t *adj);
 
-void isis_update_interface_adjacency_from_hello(interface_t *iif, 
+/*
+* isis_adj_oper()
+* Perform various operation on adjacency
+*/
+static void
+isis_adj_oper(bool new_adj, isis_adjacency_t* adj, uint8_t *attr) {
+    isis_adj_state_t next_state;
+    if (new_adj) {
+        return;
+    }
+    if (attr[IFIP]) {
+        next_state = ISIS_ADJ_STATE_DOWN;
+        goto update;       
+    }
+    next_state = isis_get_next_state(adj);
+update:
+    isis_update_adjacency_state(adj, next_state);
+}
+
+void 
+isis_update_interface_adjacency_from_hello(interface_t *iif, 
                                                 byte *hello_tlv_buffer, 
                                                 size_t tlv_buff_size) {
     bool new_adj = false;
@@ -18,6 +38,8 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
     char *val;
     isis_adjacency_t *adj = NULL;    
     isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(iif);
+    uint8_t adj_attr[MAXATTR] = {0};
+
     if (!isis_intf_info) {
         LOG(LOG_ERROR, ISIS_PKT, iif->att_node, iif, "%s: Invalid isis interface info pointer", 
                                                     __FUNCTION__);
@@ -56,6 +78,7 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
                 break;
             case ISIS_TLV_IF_IP:
                 if (isis_intf_info->adjacency->nbr_intf_ip != *(uint32_t*)val) {
+                    adj_attr[IFIP] = true;
                     nbr_attr_changed = true;
                     isis_intf_info->adjacency->nbr_intf_ip = *(uint32_t*)val;
                 }
@@ -89,10 +112,8 @@ void isis_update_interface_adjacency_from_hello(interface_t *iif,
         }
     }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)   
     /*A good hello pkt arrived at interface and adjacency already existing*/
-    if (!new_adj) {
-        isis_adj_state_t next_state = isis_get_next_state(isis_intf_info->adjacency);
-        isis_update_adjacency_state(isis_intf_info->adjacency, next_state);
-    }
+    isis_adj_oper(new_adj, isis_intf_info->adjacency, adj_attr);
+    return;
 }
 
 void
