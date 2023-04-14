@@ -1,6 +1,17 @@
 #ifndef __ISIS_ADJACENCY_H__
 #define __ISIS_ADJACENCY_H__
 
+typedef enum isis_adj_attributes_{
+    HOSTNAME,
+    RTRID,
+    IFIP,
+    IFINDEX,
+    HOLDTIME,
+    METRICVAL,
+    MACADDR,
+    MAXATTR
+}isis_adj_attributes;
+
 typedef enum isis_adj_state_ {
     ISIS_ADJ_STATE_UNKNOWN,
     ISIS_ADJ_STATE_DOWN,
