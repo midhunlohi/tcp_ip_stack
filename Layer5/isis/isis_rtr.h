@@ -5,6 +5,8 @@
 
 typedef struct isis_node_info_ {
     uint32_t adj_up_count;
+    /*L2 mapping status*/
+    bool l2_mapping;
 }isis_node_info_t;
 
 typedef struct isis_timer_data_ {

@@ -38,6 +38,7 @@ OBJS=gluethread/glthread.o \
 		  Layer5/isis/objs/isis_adjacency.o \
 		  Layer5/isis/objs/isis_trace.o \
 		  Layer5/isis/objs/isis_utils.o \
+		  Layer5/isis/objs/isis_l2map.o \
 		  #Layer2/stp/stp_state_machine.o \
 		  Layer2/stp/stp_bpdu.o \
 		  Layer2/stp/stp_init.o \
@@ -63,6 +64,9 @@ Layer5/isis/objs/isis_trace.o:Layer5/isis/isis_trace.c
 
 Layer5/isis/objs/isis_utils.o:Layer5/isis/isis_utils.c
 	${CC} ${CFLAGS} -c -I . Layer5/isis/isis_utils.c -o Layer5/isis/objs/isis_utils.o
+
+Layer5/isis/objs/isis_l2map.o:Layer5/isis/isis_l2map.c
+	${CC} ${CFLAGS} -c -I . Layer5/isis/isis_l2map.c -o Layer5/isis/objs/isis_l2map.o
 
 ted/ted.o:ted/ted.c
 	${CC} ${CFLAGS} -c -I . ted/ted.c -o ted/ted.o

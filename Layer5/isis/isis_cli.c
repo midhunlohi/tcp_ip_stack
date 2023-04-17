@@ -11,6 +11,7 @@
 #include "isis_pkt.h"
 #include "isis_trace.h"
 #include "isis_const.h"
+#include "isis_l2map.h"
 
 typedef enum status_t{ 
     SUCCESS, 
@@ -26,7 +27,9 @@ isis_init(node_t *node) {
     }
     isis_node_info = (isis_node_info_t *)malloc(sizeof(isis_node_info_t));
     memset(isis_node_info, 0x0, sizeof(isis_node_info_t));
+    isis_node_info->l2_mapping = true; // Enable L2 Mapping by default
     node->node_nw_prop.isis_node_info = isis_node_info;
+    isis_config_l2_map(node);
     tcp_stack_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
     printf("%s, ISIS protocol ENABLED on this node\n", __FUNCTION__);
     return;
@@ -45,6 +48,8 @@ isis_de_init(node_t *node) {
         isis_disable_protocol_on_interface(intf);
     }ITERATE_NODE_INTERFACES_END(node, intf);
 
+    isis_node_info->l2_mapping = false;
+    isis_un_config_l2_map(node);
     isis_check_delete_node_info(node);    
     tcp_stack_de_register_l2_pkt_trap_rule(node, isis_pkt_trap_rule, isis_pkt_receive);
     printf("%s, ISIS protocol is DISABLED in this node.\n", __FUNCTION__);
@@ -93,8 +98,38 @@ isis_config_handler(param_t *param,
                 default:
                     break;
             }
+            break;
+        case CMDCODE_SHOW_NODE_ISIS_PROTOCOL_L2MAP:
+            switch(enable_or_disable) {
+                case CONFIG_ENABLE:
+                    {
+                        isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
+                        if (!isis_node_info) {
+                            printf("%s, ISIS Protocol is not ENABLED on this node\n", __FUNCTION__);
+                            return -1;
+                        }
+                        if (!isis_node_info->l2_mapping) {
+                            isis_node_info->l2_mapping = true;
+                            isis_config_l2_map(node);
+                        }
+                    }
+                    break;
+                case CONFIG_DISABLE:
+                    {
+                        isis_node_info_t *isis_node_info = ISIS_NODE_INFO(node);
+                        if (!isis_node_info) {
+                            printf("%s, ISIS Protocol is not ENABLED on this node\n", __FUNCTION__);
+                            return -1;
+                        }
+                        isis_un_config_l2_map(node);
+                        isis_node_info->l2_mapping = false;
+                    }                    
+                    break;
+                default:
+                    break;      
+            }
+            break;
     }
-
     return 0;
 }
 
@@ -260,9 +295,20 @@ int
 isis_config_cli_tree(param_t *param) 
 {
     static param_t isis_proto;
-    init_param(&isis_proto, CMD, "isis", isis_config_handler, 0, INVALID, 0, "isis protocol");
-    libcli_register_param(param, &isis_proto);
-    set_param_cmd_code(&isis_proto, ISIS_CONFIG_NODE_ENABLE);
+    {
+        /*conf node <node-name> pro isis*/
+        init_param(&isis_proto, CMD, "isis", isis_config_handler, 0, INVALID, 0, "isis protocol");
+        libcli_register_param(param, &isis_proto);
+        set_param_cmd_code(&isis_proto, ISIS_CONFIG_NODE_ENABLE);
+    }
+    {
+        /*conf node <node-name> pro isis l2-map*/
+        static param_t l2map;
+        init_param(&l2map, CMD, "l2-map", isis_config_handler, 0, INVALID, 0, "Enable/Disable L2 Mapping");
+        libcli_register_param(&isis_proto, &l2map);
+        set_param_cmd_code(&l2map, CMDCODE_SHOW_NODE_ISIS_PROTOCOL_L2MAP);
+    }
+
 
     /*config node R1 protocol isis interface*/
     {

@@ -4,6 +4,7 @@
 #include "isis_trace.h"
 #include "isis_const.h"
 #include "isis_rtr.h"
+#include "isis_l2map.h"
 
 static void
 isis_adjacency_start_delete_timer(isis_adjacency_t *adj);
@@ -13,7 +14,7 @@ isis_adjacency_start_delete_timer(isis_adjacency_t *adj);
 * Perform various operation on adjacency
 */
 static void
-isis_adj_oper(bool new_adj, isis_adjacency_t* adj, uint8_t *attr) {
+isis_adj_oper(bool new_adj, isis_adjacency_t* adj, uint8_t* attr, isis_adjacency_t* prev_state) {
     isis_adj_state_t next_state;
     if (new_adj) {
         return;
@@ -24,7 +25,7 @@ isis_adj_oper(bool new_adj, isis_adjacency_t* adj, uint8_t *attr) {
     }
     next_state = isis_get_next_state(adj);
 update:
-    isis_update_adjacency_state(adj, next_state);
+    isis_update_adjacency_state(adj, next_state, prev_state, attr);
 }
 
 void 
@@ -39,12 +40,16 @@ isis_update_interface_adjacency_from_hello(interface_t *iif,
     isis_adjacency_t *adj = NULL;    
     isis_intf_info_t *isis_intf_info = ISIS_INTF_INFO(iif);
     uint8_t adj_attr[MAXATTR] = {0};
+    isis_adjacency_t adj_prev_state;
 
     if (!isis_intf_info) {
         LOG(LOG_ERROR, ISIS_PKT, iif->att_node, iif, "%s: Invalid isis interface info pointer", 
                                                     __FUNCTION__);
         return;
     }
+    
+    memset(&adj_prev_state, 0x0, sizeof(isis_adjacency_t));
+
     if (!isis_intf_info->adjacency) {
         /*No Existing Adjacency*/
         isis_adjacency_t *adj = NULL;
@@ -60,6 +65,8 @@ isis_update_interface_adjacency_from_hello(interface_t *iif,
         adj->adj_state = ISIS_ADJ_STATE_DOWN;
         isis_intf_info->adjacency = adj;
         isis_adjacency_start_delete_timer(isis_intf_info->adjacency);
+    } else {
+        memcpy(&adj_prev_state, isis_intf_info->adjacency, sizeof(isis_adjacency_t));
     }
 
     ITERATE_TLV_BEGIN(hello_tlv_buffer, type, len, val, tlv_buff_size){
@@ -112,7 +119,7 @@ isis_update_interface_adjacency_from_hello(interface_t *iif,
         }
     }ITERATE_TLV_END(hello_tlv_buffer, type, len, val, tlv_buff_size)   
     /*A good hello pkt arrived at interface and adjacency already existing*/
-    isis_adj_oper(new_adj, isis_intf_info->adjacency, adj_attr);
+    isis_adj_oper(new_adj, isis_intf_info->adjacency, adj_attr, &adj_prev_state);
     return;
 }
 
@@ -221,7 +228,7 @@ isis_adjacecncy_down_timer_expire_cb(void *arg, uint32_t arg_size) {
     isis_adjacency_t* adj = (isis_adjacency_t*)arg;
     timer_de_register_app_event(adj->expiry_timer);
     adj->expiry_timer = NULL;
-    isis_update_adjacency_state(adj, ISIS_ADJ_STATE_DOWN);
+    isis_update_adjacency_state(adj, ISIS_ADJ_STATE_DOWN, NULL, NULL);
 }
 
 static void
@@ -298,7 +305,9 @@ isis_get_next_state(isis_adjacency_t *adj) {
 void
 isis_update_adjacency_state(
     isis_adjacency_t* adj, 
-    isis_adj_state_t new_state) {
+    isis_adj_state_t new_state,
+    isis_adjacency_t* prev_state,
+    uint8_t *attr) {
     if (!adj) {
         return;
     }
@@ -321,6 +330,7 @@ isis_update_adjacency_state(
                             adj->adj_state = ISIS_ADJ_STATE_UP;
                             isis_adjacency_refresh_expiry_timer(adj);
                             adj->uptime = time(NULL);
+                            isis_update_l2_mapping_on_adj_up(adj->intf->att_node, adj);
                         }
                         break;     
                     case ISIS_ADJ_STATE_DOWN:
@@ -337,7 +347,12 @@ isis_update_adjacency_state(
                         {
                             adj->adj_state = new_state;
                             isis_adjacency_stop_expiry_timer(adj);
-                            isis_adjacency_start_delete_timer(adj);
+                            isis_adjacency_start_delete_timer(adj);                            
+                            if (attr && attr[IFIP] && prev_state) {
+                                isis_update_l2_mapping_on_adj_down(adj->intf->att_node, prev_state);
+                            } else {
+                                isis_update_l2_mapping_on_adj_down(adj->intf->att_node, adj);
+                            }
                         }
                         break;
                     case ISIS_ADJ_STATE_UP:
@@ -345,6 +360,7 @@ isis_update_adjacency_state(
                             adj->adj_state = new_state;
                             isis_adjacency_refresh_expiry_timer(adj);
                             isis_adjacency_set_uptime(adj);
+                            isis_update_l2_mapping_on_adj_up(adj->intf->att_node, adj); 
                             ISIS_INCREMENT_NODE_STATS(adj->intf->att_node, adj_up_count);
                         }
                         break;                    
@@ -361,6 +377,11 @@ isis_update_adjacency_state(
                             adj->adj_state = new_state;
                             isis_adjacency_stop_expiry_timer(adj);
                             isis_adjacency_start_delete_timer(adj);
+                            if (attr && attr[IFIP] && prev_state) {
+                                isis_update_l2_mapping_on_adj_down(adj->intf->att_node, prev_state);
+                            } else {
+                                isis_update_l2_mapping_on_adj_down(adj->intf->att_node, adj);
+                            }
                         }
                         break;
                     case ISIS_ADJ_STATE_UP:
