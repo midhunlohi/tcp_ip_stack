@@ -13,6 +13,8 @@ char
             return "ISIS(ADJ)";
         case ISIS_IF_UPD:
             return "ISIS(IF_UPD)";
+        case ISIS_L2MAP:
+            return "ISIS(L2MAP)";
         default:
             break;
     }

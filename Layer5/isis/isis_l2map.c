@@ -32,7 +32,7 @@ isis_config_l2_map(node_t* node) {
     if (!isis_is_protocol_enable_on_node(node)) {
         return -1;
     }
-
+    LOG(LOG_DEBUG, ISIS_L2MAP, node, NULL, "%s: Config L2 Map", __FUNCTION__);
     ITERATE_NODE_INTERFACES_BEGIN(node, intf){  
         if (isis_node_intf_is_enable(intf)) {      
             isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
@@ -64,7 +64,7 @@ isis_un_config_l2_map(node_t* node) {
     if (!isis_is_protocol_enable_on_node(node) || !node) {
         return -1;
     }
-
+    LOG(LOG_DEBUG, ISIS_L2MAP, node, NULL, "%s: Un-Config L2 Map", __FUNCTION__);
     ITERATE_NODE_INTERFACES_BEGIN(node, intf) {
         if (isis_node_intf_is_enable(intf)) {
             isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);
@@ -89,6 +89,8 @@ isis_update_l2_mapping_on_adj_up(node_t* node, isis_adjacency_t* adj) {
     if (isis_is_l2_mapping_enabled(node)) {
         uint32_t* if_ip_addr_int = &adj->nbr_intf_ip;
         char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+        LOG(LOG_DEBUG, ISIS_L2MAP, node, adj->intf, "%s: %s is adding to ARP table", 
+                                __FUNCTION__, if_ip_addr_str);
         arp_entry_add(node, if_ip_addr_str, adj->nbr_mac, adj->intf, PROTO_ISIS);
     }
 }
@@ -106,6 +108,8 @@ isis_update_l2_mapping_on_adj_down(node_t *node, isis_adjacency_t* adj) {
     if (isis_is_l2_mapping_enabled(node)) {
         uint32_t* if_ip_addr_int = &adj->nbr_intf_ip;
         char* if_ip_addr_str = tcp_ip_covert_ip_n_to_p(*if_ip_addr_int, 0);
+         LOG(LOG_DEBUG, ISIS_L2MAP, node, adj->intf, "%s: %s is deleting from ARP table", 
+                                __FUNCTION__, if_ip_addr_str);
         arp_entry_delete(node, if_ip_addr_str, PROTO_ISIS);
     }
     return true;

@@ -4,6 +4,7 @@
 #include "isis_adjacency.h"
 #include "isis_rtr.h"
 #include "isis_intf.h"
+#include "isis_trace.h"
 
 bool
 isis_is_l2_mapping_enabled(node_t*);
