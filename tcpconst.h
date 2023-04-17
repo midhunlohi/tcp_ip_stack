@@ -80,7 +80,10 @@ proto_name_str (uint16_t proto) {
             return "static";
         case PROTO_ARP:
             return "arp";
-        default: ;
+        case PROTO_ISIS:
+            return "isis";
+        default: 
+            return "";
     }
 }
 

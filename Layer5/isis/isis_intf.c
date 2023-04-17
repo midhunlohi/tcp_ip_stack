@@ -4,6 +4,7 @@
 #include "isis_const.h"
 #include "isis_pkt.h"
 #include "isis_trace.h"
+#include "isis_l2map.h"
 
 static void
 isis_init_isis_intf_info(interface_t *intf_ptr) {
@@ -84,6 +85,7 @@ isis_disable_protocol_on_interface(interface_t *intf) {
     }
     isis_stop_sending_hellos(intf);
     /*Delete the adjacencies*/
+    isis_update_l2_mapping_on_adj_down(intf->att_node, intf_info_ptr->adjacency);
     isis_delete_adjacency(intf_info_ptr->adjacency);
     isis_check_and_delete_intf_info(intf);
     return 0;
@@ -185,20 +187,40 @@ isis_interface_quality_to_send_hellos(interface_t *intf) {
 void
 isis_print_drop_stats(interface_t *intf) {
     isis_intf_info_t *intf_info_ptr = ISIS_INTF_INFO(intf);    
-    PRINT_TABS(5);
-    printf("ISIS_PROTO_NOT_ENABLED : %d\n", intf_info_ptr->drop_stats[ISIS_PROTO_NOT_ENABLED]);
-    PRINT_TABS(5);
-    printf("INTF_NOT_QUALIFIED : %d\n", intf_info_ptr->drop_stats[INTF_NOT_QUALIFIED]);
-    PRINT_TABS(5);
-    printf("DEST_MAC_IS_NOT_BCAST : %d\n", intf_info_ptr->drop_stats[DEST_MAC_IS_NOT_BCAST]);
-    PRINT_TABS(5);
-    printf("IP_TLV_MISSING : %d\n", intf_info_ptr->drop_stats[IP_TLV_MISSING]);
-    PRINT_TABS(5);
-    printf("IP_SUBNET_MISMATCH : %d\n", intf_info_ptr->drop_stats[IP_SUBNET_MISMATCH]);
-    PRINT_TABS(5);
-    printf("AUTH_DISABLED : %d\n", intf_info_ptr->drop_stats[AUTH_DISABLED]);
-    PRINT_TABS(5);
-    printf("AUTH_MISMATCH : %d\n", intf_info_ptr->drop_stats[AUTH_MISMATCH]);
+    if (intf_info_ptr->drop_stats[ISIS_PROTO_NOT_ENABLED]) {
+        PRINT_TABS(5);
+        printf("ISIS_PROTO_NOT_ENABLED : %d\n", intf_info_ptr->drop_stats[ISIS_PROTO_NOT_ENABLED]);
+    }
+    
+    if (intf_info_ptr->drop_stats[INTF_NOT_QUALIFIED]) {
+        PRINT_TABS(5);
+        printf("INTF_NOT_QUALIFIED : %d\n", intf_info_ptr->drop_stats[INTF_NOT_QUALIFIED]);
+    }
+    
+    if (intf_info_ptr->drop_stats[DEST_MAC_IS_NOT_BCAST]) {
+        PRINT_TABS(5);
+        printf("DEST_MAC_IS_NOT_BCAST : %d\n", intf_info_ptr->drop_stats[DEST_MAC_IS_NOT_BCAST]);
+    }
+    
+    if (intf_info_ptr->drop_stats[IP_TLV_MISSING]) {
+        PRINT_TABS(5);
+        printf("IP_TLV_MISSING : %d\n", intf_info_ptr->drop_stats[IP_TLV_MISSING]);
+    }
+    
+    if (intf_info_ptr->drop_stats[IP_SUBNET_MISMATCH]) {
+        PRINT_TABS(5);
+        printf("IP_SUBNET_MISMATCH : %d\n", intf_info_ptr->drop_stats[IP_SUBNET_MISMATCH]);
+    }
+    
+    if (intf_info_ptr->drop_stats[AUTH_DISABLED]) {
+        PRINT_TABS(5);
+        printf("AUTH_DISABLED : %d\n", intf_info_ptr->drop_stats[AUTH_DISABLED]);
+    }
+    
+    if (intf_info_ptr->drop_stats[AUTH_MISMATCH]) {
+        PRINT_TABS(5);
+        printf("AUTH_MISMATCH : %d\n", intf_info_ptr->drop_stats[AUTH_MISMATCH]);
+    }
 }
 
 void

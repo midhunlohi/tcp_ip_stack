@@ -71,11 +71,18 @@ isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth
     char *password = tlv_buffer_get_particular_tlv(hello_tlv_buffer, tlv_buff_size, ISIS_TLV_AUTH, &password_len);
     if (!password && !password_len) {
         LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "password is EMPTY");
+        if (isis_intf_info->authentication.auth_enable) {
+            isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN, NULL, NULL);
+            if (isis_intf_info) {
+                isis_intf_info->drop_stats[AUTH_MISMATCH]++;
+            }
+            goto bad_hello;
+        }
     } else {
         LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "password is %s", password);
         if (!isis_intf_info->authentication.auth_enable) {
             LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "Auth is not enabled");
-            isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN);
+            isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN, NULL, NULL);
             if (isis_intf_info) {
                 isis_intf_info->drop_stats[AUTH_DISABLED]++;
             }
@@ -83,7 +90,7 @@ isis_process_hello_pkt(node_t *node, interface_t *iif, ethernet_hdr_t *hello_eth
         } else {
             if (memcmp(isis_intf_info->authentication.password, password, AUTH_PASSWD_LEN)) {
                 LOG(LOG_DEBUG, ISIS_ADJ, iif->att_node, iif, "Auth is not MATCHING");
-                isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN);
+                isis_update_adjacency_state(isis_intf_info->adjacency, ISIS_ADJ_STATE_DOWN, NULL, NULL);
                 if (isis_intf_info) {
                     isis_intf_info->drop_stats[AUTH_MISMATCH]++;
                 }
